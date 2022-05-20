@@ -1,0 +1,14 @@
+include "nat.decls"
+
+type nat =
+  | O
+  | S of nat
+
+type bool =
+  | True
+  | False
+synth nat -> bool satisfying
+
+[0] -> True,
+[2] -> True,
+[3] -> False

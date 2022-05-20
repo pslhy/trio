@@ -1,0 +1,14 @@
+include "nat.decls"
+include "compare.decls"
+
+type list =
+  | Nil
+  | Cons of nat * list
+
+synth list -> list -> list satisfying
+
+[Nil, Nil] -> Nil,
+[Nil, Cons(2,Cons(1,Nil))] -> Cons(2,Cons(1,Nil)),
+[Cons(4,Cons(2,Nil)), Nil] -> Cons(4,Cons(2,Nil)),
+[Cons(5,Cons(3,Nil)), Cons(5, Cons(2,Nil))] -> Cons(5,Cons(5, Cons(3, Cons(2, Nil)))),
+[Cons(3,Cons(2,Cons(1,Nil))), Cons(5,Cons(4,Nil))] -> Cons(5,Cons(4,Cons(3,Cons(2,Cons(1,Nil))))),

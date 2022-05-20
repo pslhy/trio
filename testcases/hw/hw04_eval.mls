@@ -1,0 +1,19 @@
+type formula =
+  | True
+  | False
+  | Not of formula
+  | And of formula * formula
+
+synth formula -> formula satisfying
+
+[True] -> True,
+[False] -> False,
+[Not(True)] -> False,
+[Not(False)] -> True,
+[Not(Not(True))] -> True,
+[Not(Not(False))] -> False,
+[Not(Not(Not(True)))] -> False,
+[Not(Not(Not(False)))] -> True,
+[And(True,False)] -> False,
+[And(True,True)] -> True,
+[And(And(True,True),Not(False))] -> True,

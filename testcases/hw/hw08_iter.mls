@@ -1,0 +1,14 @@
+type nat =
+  | O
+  | S of nat
+
+let add2 =
+    fun (n:nat) -> S(S(n))
+;;
+
+synth (nat -> nat) -> nat -> nat -> nat satisfying
+
+[add2, 0, 1] -> 1,
+[add2, 2, 3] -> 7,
+[add2, 3, 0] -> 6,
+[add2, 1, 0] -> 2,

@@ -1,0 +1,43 @@
+type nat =
+  | O
+  | S of nat
+
+type list =
+  | Nil
+  | Cons of nat * list
+
+type bool =
+  | True
+  | False
+
+type llist =
+  | LNil
+  | LCons of list * llist
+
+let is_even =
+  fix (is_even : nat -> bool) =
+    fun (x1 : nat) ->
+      match x1 with
+      | O -> True
+      | S x1p ->
+        (match x1p with
+         | O -> False
+         | S x1pp -> is_even x1pp)
+;;
+
+let is_zero =
+  fun (x1 : nat) ->
+    match x1 with
+    | O -> True
+    | S _ -> False
+;;
+
+synth (nat -> bool) -> list -> llist satisfying
+
+[is_even, Cons(1,Cons(2,Cons(3,Cons(4,Nil))))] -> LCons(Cons(2,Cons(4,Nil)), LCons(Cons(1,Cons(3,Nil)),LNil)),
+[is_even, Nil] -> LCons(Nil,LCons(Nil,LNil)),
+[is_even, Cons(1,Cons(2,Nil))] -> LCons(Cons(2,Nil), LCons(Cons(1,Nil),LNil)),
+[is_even, Cons(1,Nil)] -> LCons(Nil, LCons(Cons(1,Nil),LNil)),
+[is_even, Cons(2,Nil)] -> LCons(Cons(2,Nil), LCons(Nil,LNil)),
+[is_zero, Cons(1,Cons(2,Cons(3,Cons(4,Nil))))] -> LCons(Nil, LCons(Cons(1,Cons(2,Cons(3,Cons(4,Nil)))),LNil)),
+[is_zero, Cons(0,Cons(1,Cons(2,Cons(3,Nil))))] -> LCons(Cons(0,Nil), LCons(Cons(1,Cons(2,Cons(3,Nil))),LNil)),

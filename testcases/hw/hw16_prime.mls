@@ -1,0 +1,12 @@
+include "nat.decls"
+
+synth nat -> nat -> bool satisfying
+
+[7,6] -> True,
+[3,2] -> True,
+[4,3] -> False,
+[2,1] -> True,
+[1,0] -> True,
+[0,0] -> True,
+[6,5] -> False,
+[8,7] -> False,

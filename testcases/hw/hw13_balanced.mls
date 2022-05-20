@@ -1,0 +1,20 @@
+type nat =
+  | O
+  | S of nat
+
+type tree =
+  | Leaf
+  | Node of nat * tree * tree
+
+type bool =
+  | True
+  | False
+
+synth tree -> bool satisfying
+
+[Leaf] -> True,
+[Node (2, Leaf, Leaf)] -> True,
+[Node (0, Node (1, Leaf, Leaf), Leaf)] -> True,
+[Node (0, Node (1, Node (2, Leaf, Leaf), Leaf), Leaf)] -> False,
+[Node (0, Node (1, Node (3, Leaf, Leaf), Node (4, Leaf, Leaf)), Node (2, Leaf, Leaf))] -> True,
+[Node (0, Node (1, Node (3, Leaf, Leaf), Node (4, Leaf, Node (5, Leaf, Leaf))), Node (2, Leaf, Leaf))] ->  False,
