@@ -139,7 +139,7 @@ let concolic_eval spec upper_bound (orig_expr : t) (input : value) : t =
 			if (!cnt > !Options.concolic_eval_threshold) then failwith "possibly infinite loop!"
 		in *)
 		(* let _ = if (BatSet.mem e !evaluated_so_far) then failwith "infinite loop!" else () in *)
-		let _ = my_prerr_endline ("concolic_eval_sub [" ^ (string_of_int upper_bound) ^ "] : " ^ (show e)) in
+		(* let _ = my_prerr_endline ("concolic_eval_sub [" ^ (string_of_int upper_bound) ^ "] : " ^ (show e)) in *)
 		let e_size = 
 			match e with 
 			| Match (_, patterns) -> 

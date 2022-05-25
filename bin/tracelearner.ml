@@ -489,7 +489,7 @@ let synthesis spec =
 		(* clean up caches *)
 		let _ = init () in
 		let _ = 
-			if depth > (BatInt.pow 2 !Options.max_height) then 
+			if depth > !Options.max_height then 
 				failwith (Printf.sprintf "No solution within depth of %d." !Options.max_height) 
 		in
 		let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 

@@ -544,6 +544,7 @@ and learn_app candidate addr available_uncons pts spec (desired_sig, desired_typ
 						in
 						let ekind = App(Var target_func, arg_expr) in 
 						let plugged = plug candidate (addr, ekind) in 
+						(* from spec : TODO check if it works well *)
 						let _ = 
 							if in_spec then 
 								let sg = compute_signature spec inputs arg_expr in 
@@ -598,7 +599,8 @@ and learn_app candidate addr available_uncons pts spec (desired_sig, desired_typ
 				with SubSolutionFound plugged -> BatSet.singleton (plugged, [])
 	in
 	(* non recursive functions *)
-	let result_lib = BatSet.empty
+	let result_lib = 
+		(* BatSet.empty *)
 		(* library: value -> (closure * fun_type * (arg value list)) list) 
 			 desired_sig: [o1, o2, o3, o4] 
 			 pts: [1, 3]
@@ -609,8 +611,9 @@ and learn_app candidate addr available_uncons pts spec (desired_sig, desired_typ
 			 desired_sig_argn : [arg_vn, o2, arg_vn', o4],  [arg_vn'', o2, arg_vn''', o4]
 
 			  *)
-(* 		
-		let lst = 
+		
+		(* desired_fun_argvs : for each desired output o_i, triple of (f, fun_ty, v1...vk) s.t. (..(f v1)..vk)..) = o_i *)		
+		let desired_fun_argvs_lst = 
 			BatList.mapi (fun i output -> 
 				if (BatList.mem i pts) && (BatMap.mem output !Tracelearner.library) then 
 					BatMap.find output !Tracelearner.library
@@ -620,22 +623,68 @@ and learn_app candidate addr available_uncons pts spec (desired_sig, desired_typ
 			) desired_sig
 			|> BatList.n_cartesian_product
 		in 
-		BatList.map (fun desired_fun_argvs -> 
-			let is_single_funv = ... in 
-
-
-		) lst 
-		
-				let usable_funcvs = 
-			(* ToDO: avoid repeated computation of this *)
-			let all_funcvs = 
-				BatMap.foldi (fun _ lst acc -> 
-					BatSet.union acc (list2set (List.map (fun (funcv,_,_)->funcv) lst))) 
-					!Tracelearner.library BatSet.empty 
+		List.fold_left (fun result desired_fun_argvs -> 
+			let _ = assert ((List.length desired_fun_argvs) = List.length desired_sig) in
+			(* desired_fun_argvs : for each desired output o_i, triple of (f, fun_ty, v1...vk) s.t. (..(f v1)..vk)..) = o_i *)
+			let funcv_tys = 
+				List.fold_left (fun acc (funcv,fun_ty,_) -> 
+					if is_wildcard_value funcv then acc else BatSet.add (funcv,fun_ty) acc
+				) BatSet.empty desired_fun_argvs
 			in
-			
+			let is_single_funv = (BatSet.cardinal funcv_tys) = 1 in 
+			if not is_single_funv then result
+			else 
+				let funcv, fun_ty = BatSet.choose funcv_tys in 
+				let (arg_ty, result_ty) = Specification.st_to_pair fun_ty in 
+				let arg_tys = 
+					let _ = assert (Type.equal result_ty desired_type) in 
+					match arg_ty with
+					| Type.Tuple ts -> ts
+					| _ -> [arg_ty]
+				in
+				(* let _ = 
+					List.iter (fun (funcv,fun_ty,argvs) -> 
+						prerr_endline ("funcv : " ^ (Expr.show_value funcv));
+						prerr_endline ("fun_ty : " ^ (Type.show fun_ty));
+						prerr_endline ("argvs : " ^ (string_of_list Expr.show_value argvs));
+						assert ((List.length argvs) = (List.length arg_tys) || (is_wildcard_value funcv))
+					) desired_fun_argvs 
+				in  *)
+				(* type subgoal = points * signature * Type.t  *)
+				(* type t = Expr.t * (addr * available_uncons * subgoal) list  *)
+				let plugged = 
+					let ekind = List.fold_left (fun acc _ -> App(acc, Wildcard)) Wildcard arg_tys in 
+					plug candidate (addr, ekind) 
+				in 
+				let addrs = 
+					List.fold_left (fun acc _ ->  
+						(* App(App(App(f,a1),a2),a3)  
+						[0;0;0] [0;0;1] [0;1] [1] *)
+						(List.map (fun lst -> 0::lst) acc) @ [[1]]
+					) [ addr@[0] ; addr@[1] ] (List.tl arg_tys) in
+				let _,hole_infos = 
+					let funcv_hole_info = 
+						(List.hd addrs, available_uncons, (pts, BatList.make (List.length desired_sig) funcv, fun_ty))
+					in
+					List.fold_left (fun (arg_index, hole_infos) arg_addr -> 
+						let desired_sig' = 
+							List.fold_left (fun acc (funcv,_,args) -> 
+								if is_wildcard_value funcv then acc @ [WildcardV] 
+								else 
+									let _ = assert ((List.length args) > arg_index) in 
+									acc @ [List.nth args arg_index]
+							) [] desired_fun_argvs 
+						in 
+						let desired_type' = List.nth arg_tys arg_index in 
+						let hole_info = (arg_addr, available_uncons, (pts, desired_sig', desired_type')) in
+						(arg_index + 1, hole_infos @ [hole_info])
+					) (0, [funcv_hole_info]) (List.tl addrs)
+				in 
+				BatSet.add (plugged, hole_infos) result  
+		) BatSet.empty desired_fun_argvs_lst 
+		
 
-		List.map (fun pt ->
+		(* List.map (fun pt ->
 			let output = List.nth desired_sig pt in
 			if not (BatMap.mem output !Tracelearner.library) then Empty
 			else

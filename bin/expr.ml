@@ -174,6 +174,7 @@ let rec get_expr_from_addr expr addr =
 			| Fix (_, _, e) -> BatList.at [Wildcard; Wildcard; e] (BatList.hd addr)
 			| Tuple es -> BatList.at es (BatList.hd addr)
 			| Proj (_, e) -> BatList.at [Wildcard; e] (BatList.hd addr)
+			| App (e1, e2) -> BatList.at [e1; e2] (BatList.hd addr)
 			| _ -> 
 				failwith (Printf.sprintf "get_expr_from_addr: expr %s at addr %s" (show expr) (string_of_list string_of_int addr))
 		in
