@@ -127,9 +127,10 @@ exception NoSolInVSA
 exception VSAFound of vsa BatSet.t
 exception LearnFailure
 exception LearnMatchFailure
+exception SubSolutionFound of Expr.t 
 
 (* sig -> expr (<= size) *)
-let get_components_of_depth spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (curr_depth, max_depth) =
+let get_components_of_depth ?(grow_funcs=[]) spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (curr_depth, max_depth) =
 	let input_values = List.map fst spec.spec in 
 	let desired_sig = List.map snd spec.spec in
 	let result_top = BatList.make (List.length desired_sig) WildcardV in 
@@ -152,7 +153,9 @@ let get_components_of_depth spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (curr_de
   	else (ty_to_exprs, ty_to_sigs, sig_to_expr) 
 	in	
 	let grow_funcs = 
-		[grow_tuple; grow_proj; grow_ctor; grow_unctor; grow_eq; grow_app]
+		if BatList.is_empty grow_funcs then 
+			[grow_tuple; grow_proj; grow_ctor; grow_unctor; grow_eq; grow_app]
+		else grow_funcs
 	in
 	let rec iter depth (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 		if depth >= max_depth then 
@@ -164,11 +167,19 @@ let get_components_of_depth spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (curr_de
   					let (ty_to_exprs', ty_to_sigs, sig_to_expr) = 
 							grow_func desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr)
 						in
+						(* let _ = 
+							my_prerr_endline "ty_to_exprs' : ";
+							my_prerr_endline (string_of_map Type.show (string_of_set Expr.show) ty_to_exprs')
+						in  *)
 						(ty_to_exprs' :: ty_to_exprs_list, ty_to_sigs, sig_to_expr)
   				) ([], ty_to_sigs, sig_to_expr) grow_funcs
 				in
 				(merge_maps BatSet.empty BatSet.union ty_to_exprs_list, ty_to_sigs, sig_to_expr)
   		in
+			(* let _ = 
+				my_prerr_endline "merged : ";
+				my_prerr_endline (string_of_map Type.show (string_of_set Expr.show) ty_to_exprs)
+			in  *)
 			iter (depth + 1) (ty_to_exprs, ty_to_sigs, sig_to_expr)
 	in
 	iter curr_depth (ty_to_exprs, ty_to_sigs, sig_to_expr)

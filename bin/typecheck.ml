@@ -47,6 +47,7 @@ type variant_context = (string, Type.t * Type.t) BatMap.t (* arg_ty * parent_ty 
 let rec typecheck_exp (ec:eval_context) (tc:type_context) 
 											(td:type_definition) (vc:variant_context) (e:Expr.t) : Type.t =
   let typecheck_simple = typecheck_exp ec tc td vc in
+  (* let _ = my_prerr_endline ("type check: " ^ (Expr.show e)) in *)
   match e with
   | Wildcard -> failwith ("not typeable: " ^ (Expr.show e))
   | Unctor (i, _) ->
@@ -63,7 +64,7 @@ let rec typecheck_exp (ec:eval_context) (tc:type_context)
     _bool
   | App (e1,e2) ->
     let t1 = concretify td (typecheck_simple e1) in
-    let (t11,t12) = destruct_arrow t1 in
+    let (t11,t12) = try destruct_arrow t1 with _ -> failwith ("destruct_arrow: " ^ Type.show t1) in
     let t2 = typecheck_simple e2 in
     (* if type_equiv tc t11 t2 then *)
       t12

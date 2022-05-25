@@ -8,7 +8,7 @@ open Generator
 let learn_cache : (int list * signature, (vsa * int)) BatMap.t ref = ref BatMap.empty
 let now_learning = ref BatSet.empty 
 
-(* library: value -> (closure * (arg value list)) list) *)
+(* library: value -> (closure * fun_type * (arg value list)) list) *)
 let library : (value, (value * Type.t * value list) list) BatMap.t ref = ref BatMap.empty 
 	
 (* pts : indices of IO-examples which should be satisfied *)
@@ -333,21 +333,20 @@ and learn_funcs = [learn_ctor; learn_unctor; learn_tuple; learn_proj; learn_app]
 (* library: value (output) -> (closure * type * (value list)) list  (closure, type, arg values) *)
 let compute_library spec ty_to_sigs =
 	(* size of the largest input value *)
-	let max_size = 
+	let max_height = 
 		let inputs : value list = List.map fst spec.spec in 
-		List.fold_left (fun max_size input ->
-			let size = 
+		List.fold_left (fun max_height input ->
+			let height = 
 				match input with 
 				|	TupleV vs -> 
-					BatList.max (List.map (fun v -> size_of_expr (exp_of_value v)) vs) 
-				| _ -> size_of_expr (exp_of_value input)
+					BatList.max (List.map (fun v -> height_of_expr (exp_of_value v)) vs) 
+				| _ -> height_of_expr (exp_of_value input)
 			in
-			if max_size < size then size else max_size
+			if max_height < height then height else max_height
 		) 0 inputs   
 	in
-	let max_height = ceil ((log (float_of_int max_size)) /. (log  2.0)) |> int_of_float in   
-	(* more than 3 transitions is too expensive *)
-	let max_height = min max_height 3 in 
+	(* let max_height = ceil ((log (float_of_int max_size)) /. (log 2.0)) |> int_of_float in    *)
+	(* let max_height = min max_height !Options.max_height in  *)
 	let _ = my_prerr_endline (Printf.sprintf "max height for fuzzing: %d" max_height) in
 	(* collect all user-provided functions and their types *)
 	let func_definitions : (value * Type.t) BatSet.t (* closure, type *) =
@@ -367,7 +366,31 @@ let compute_library spec ty_to_sigs =
 		) ty_to_sigs BatSet.empty 
 	in
 	(* collect constants *)
-	let (ty_to_exprs,_,_) =
+	let (*(ty_to_exprs, _, _)*)ty_to_exprs = 
+		BatMap.foldi (fun ty sigs ty_to_exprs -> 
+			BatSet.fold (fun sg ty_to_exprs -> 
+				let exprs = try BatMap.find ty ty_to_exprs with _ -> BatSet.empty in 
+				let exprs' =
+					List.fold_left (fun acc v -> 
+						if is_bot_value v then acc 
+						else BatSet.add (exp_of_value v) acc
+					) exprs sg
+				in
+				BatMap.add ty exprs' ty_to_exprs
+			) sigs ty_to_exprs 
+		) ty_to_sigs BatMap.empty 
+
+		(* let rec fix depth (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
+			let (ty_to_exprs', ty_to_sigs', sig_to_expr') = 
+				get_components_of_depth ~grow_funcs:[grow_ctor; grow_tuple] spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)
+			in
+			if (BatMap.compare BatSet.compare ty_to_exprs' ty_to_exprs) = 0 || depth > max_height then 
+				(ty_to_exprs, ty_to_sigs, sig_to_expr)
+			else fix (depth + 1) (ty_to_exprs', ty_to_sigs', sig_to_expr')
+		in
+		fix 2 (BatMap.add Type._unit (BatSet.singleton unit_) BatMap.empty, BatMap.empty, BatMap.empty) *)
+	in
+	(* let (ty_to_exprs,_,_) =
 		let (ty_to_exprs, ty_to_sigs, sig_to_expr) =
   		(BatMap.add Type._unit (BatSet.singleton unit_) BatMap.empty,
   		 BatMap.empty, 
@@ -385,7 +408,7 @@ let compute_library spec ty_to_sigs =
 				iter (target_height + 1) (ty_to_exprs, ty_to_sigs, sig_to_expr)
   	in  
 		iter 1 (ty_to_exprs, ty_to_sigs, sig_to_expr) 
-	in 
+	in  *)
 	let _ = my_prerr_endline (string_of_map Type.show (fun s -> string_of_set Expr.show s) ty_to_exprs) in  
 	(* call the funcs with the constants as arguments *)
 	BatSet.fold (fun (funv, ty) lib ->
@@ -447,6 +470,21 @@ let synthesis spec =
 	let ty_to_exprs = BatMap.empty in
 	let ty_to_sigs = BatMap.empty in 
 	let sig_to_expr = BatMap.empty in
+	(* collect exprs that can be used as a variable in a match expression *)
+	let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
+		let rec fix depth (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
+			let (ty_to_exprs', ty_to_sigs', sig_to_expr') = 
+				get_components_of_depth ~grow_funcs:[grow_unctor; grow_proj] spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)
+			in
+			if (BatMap.compare BatSet.compare ty_to_exprs' ty_to_exprs) = 0 then (ty_to_exprs, ty_to_sigs, sig_to_expr)
+			else fix (depth + 1) (ty_to_exprs', ty_to_sigs', sig_to_expr')
+		in
+		fix 1 (ty_to_exprs, ty_to_sigs, sig_to_expr)
+	in
+	let _ = 
+		let exprs = BatMap.foldi (fun _ exprs acc -> BatSet.union exprs acc) ty_to_exprs BatSet.empty in   
+		my_prerr_endline (Printf.sprintf "initial components: %s" (string_of_set Expr.show exprs))
+	in
 	let rec iter depth (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 		(* clean up caches *)
 		let _ = init () in

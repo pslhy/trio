@@ -125,15 +125,21 @@ let compute_signature ?(result_top=[]) spec input_values e =
 	(* in                                                                                                        *)
 	result
 
-
+	
 let concolic_eval spec upper_bound (orig_expr : t) (input : value) : t = 
 	if not (is_runnable spec orig_expr) then failwith "not runnable"
 	else 
 	let _ = my_prerr_endline ("concolic_eval: " ^ (show orig_expr) ^ " upper_bound : " ^ (string_of_int upper_bound)) in
 	(* let evaluated_so_far = ref BatSet.empty in  *) (* a temporary expediment to avoid non-termination, which is SO bad -- extremely expensive *)
+	(* let cnt = ref 0 in  *)
+	let prev_match = ref Wildcard in 
 	let rec concolic_eval_sub upper_bound e = 
+		(* let _ = 
+			incr cnt;
+			if (!cnt > !Options.concolic_eval_threshold) then failwith "possibly infinite loop!"
+		in *)
 		(* let _ = if (BatSet.mem e !evaluated_so_far) then failwith "infinite loop!" else () in *)
-		(* let _ = my_prerr_endline ("concolic_eval_sub [" ^ (string_of_int upper_bound) ^ "] : " ^ (show e)) in *)
+		let _ = my_prerr_endline ("concolic_eval_sub [" ^ (string_of_int upper_bound) ^ "] : " ^ (show e)) in
 		let e_size = 
 			match e with 
 			| Match (_, patterns) -> 
@@ -144,6 +150,8 @@ let concolic_eval spec upper_bound (orig_expr : t) (input : value) : t =
 		if (not is_recursive) && (upper_bound <= 0 || e_size > upper_bound) then 
 			failwith "concolic_eval: expression too big"
 		else 
+		let _ = if is_match_exp e && (Expr.equal !prev_match e) then failwith "concolic_eval: infinite loop" else () in
+		let _ = if is_match_exp e then prev_match := e else () in
 		let result = 
 			match e with
 			| App (Var i, e2) when (BatString.equal i target_func) ->
@@ -300,8 +308,10 @@ let grow
       				(* if (new_sig || not_runnable) && (not invalid) && (terminating) then *)
 							(* let _ =                                                                    *)
 							(* 	if (is_recursive e) then                                                 *)
-							(* 		(prerr_endline ("expr : " ^ (Expr.show e));                            *)
-							(* 		prerr_endline ("new_sig : " ^ (string_of_bool new_sig));               *)
+							(* prerr_endline ("expr : " ^ (Expr.show e));                            
+							prerr_endline ("signature : " ^ (string_of_signature signature));              
+							prerr_endline ("new_sig? : " ^ (string_of_bool new_sig));
+							prerr_endline ("invalid? : " ^ (string_of_bool invalid));               *)
 							(* 		prerr_endline ("is_recursive : " ^ (string_of_bool (is_recursive e))); *)
 							(* 		prerr_endline ("decreasing : " ^ (string_of_bool decreasing))          *)
 							(* 		)                                                                      *)
@@ -329,15 +339,31 @@ let grow_app desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 	let result_ty_arg_tys_arg_expss_set : (Type.t * (Type.t list) * (Expr.t list) list) BatSet.t =
 		BatMap.foldi (fun ty _ acc -> 
 		  if (Type.is_arrow_type ty) then
-				let (t1, t2) = Type.destruct_arrow ty in 
-				BatSet.add (t2, [ty; t1], []) acc 
+				(* let (t1, t2) = Type.destruct_arrow ty in  *)
+				let (t1, t2) = Specification.st_to_pair ty in
+				if Type.is_tuple_type t1 then 
+					let arg_tys = Type.destruct_tuple t1 in 
+					BatSet.add (t2, ty :: arg_tys, []) acc 
+				else 
+					BatSet.add (t2, [ty; t1], []) acc 
 			else acc
 		) ty_to_exprs BatSet.empty 
 	in
 	let plug instances = 
-		let _ = assert ((List.length instances) = 2) in 
-		let (e1, e2) = (List.nth instances 0, List.nth instances 1) in 
-		[App (e1, e2)] 
+		let _ = assert ((List.length instances) >= 2) in 
+		let fun_exp = (List.hd instances) in 
+		let arg_exps = (List.tl instances) in
+		(* target function : argument is a single pair *)
+		if Expr.equal fun_exp (Var target_func) then 
+			[App (fun_exp, Tuple arg_exps)]
+		else 
+			[List.fold_left (fun acc e -> App (acc, e)) fun_exp arg_exps]
+		(* let (e1, e2) = (List.nth instances 0, List.nth instances 1) in 
+		if is_tuple_exp e2 then 
+			[List.fold_left (fun acc e -> App (acc, e)) e1 (Expr.destruct_tuple e2)]
+		else 
+			[App (e1, e2)]  *)
+		(* [App (e1, e2)] 	 *)
 	in
 	grow desired_sig spec result_ty_arg_tys_arg_expss_set plug (ty_to_exprs, ty_to_sigs, sig_to_expr) 
 				
@@ -574,6 +600,8 @@ let grow_proj desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 				(ty_to_exprs, ty_to_sigs, sig_to_expr)
 			else
   			BatSet.fold (fun expr (ty_to_exprs, ty_to_sigs, sig_to_expr) ->
+					if is_tuple_exp expr then (ty_to_exprs, ty_to_sigs, sig_to_expr)
+					else
   				List.fold_left (fun (ty_to_exprs, ty_to_sigs, sig_to_expr) i ->
   					let e = Proj (i, expr) in
   					let result_ty = try List.nth arg_types i with _ -> assert false in 
@@ -588,6 +616,10 @@ let grow_proj desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 							let invalid = (equal_signature signature result_bot) in 
 							(* let is_rec = is_recursive e in                     *)
 							let decreasing = is_structurally_decreasing spec e in
+							(* prerr_endline ("expr : " ^ (Expr.show e));                            
+							prerr_endline ("signature : " ^ (string_of_signature signature));              
+							prerr_endline ("new_sig? : " ^ (string_of_bool new_sig));
+							prerr_endline ("invalid? : " ^ (string_of_bool invalid));               *)
       				(* if (new_sig || not_runnable) && (not invalid) && (terminating) then *)
 							if new_sig && ((not (is_recursive e)) || decreasing) && (not invalid) then 
       					(add_expr result_ty e ty_to_exprs, 

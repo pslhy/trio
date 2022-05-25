@@ -60,7 +60,12 @@ let fix_str = "fix"
 let tuple_str = "tuple"
 let proj_str = "proj"
 
-let rec size_of_expr e =
+let destruct_tuple e = 
+	match e with 
+	Tuple es -> es 
+	| _ -> failwith "destruct_tuple: not a tuple"
+
+	let rec size_of_expr e =
 	match e with
 	| Var _ -> 1
   | Wildcard -> 1
@@ -498,6 +503,9 @@ let rec get_unconstructors e =
   | Proj (_, e) -> (get_unconstructors e)
 	| _ -> BatSet.empty  
 	
+let using_allowed_unconstructor expr available_uncons = 
+	(BatSet.subset (get_unconstructors expr) available_uncons)
+
 let rec get_args e =
 	match e with 
  	| App (Var _, e2) -> BatSet.add e2 (get_args e2)
