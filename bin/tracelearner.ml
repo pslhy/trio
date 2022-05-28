@@ -55,21 +55,18 @@ let rec learn available_depth pts spec (desired_sig, desired_type)
   			) sigs BatSet.empty  
 			in
 			(* to collect traces as many as possible, we continue searching *)
-			(* if (not !Options.find_all) && (not (BatSet.is_empty vsas)) then 
-  			vsa_of_vsas vsas
-  		else *)
-  			(* 다른 rule 들 사용한 결과 추가 *)
-  			let vsas = 
-					List.fold_left (fun vsas learn_func ->
-    				let vsa = 
-    					learn_func available_depth pts spec (desired_sig, desired_type) (ty_to_exprs, ty_to_sigs, sig_to_expr)
-    				in
-    				if (vsa = Empty) then vsas
-    				else BatSet.add vsa vsas 	 
-    			) vsas learn_funcs
-  			in 
-  			if (BatSet.is_empty vsas) then Empty 
-  			else vsa_of_vsas vsas
+			(* 다른 rule 들 사용한 결과 추가 *)
+			let vsas = 
+				List.fold_left (fun vsas learn_func ->
+					let vsa = 
+						learn_func available_depth pts spec (desired_sig, desired_type) (ty_to_exprs, ty_to_sigs, sig_to_expr)
+					in
+					if (vsa = Empty) then vsas
+					else BatSet.add vsa vsas 	 
+				) vsas learn_funcs
+			in 
+			if (BatSet.is_empty vsas) then Empty 
+			else vsa_of_vsas vsas
 		in
 		let _ = 
 			learn_cache := BatMap.add key (result, available_depth) !learn_cache;
@@ -126,7 +123,7 @@ and learn_unctor available_depth pts spec (desired_sig, desired_type)
 	let constructor_desired_types = 
 		(* ctor(v:arg_ty) : parent_ty *)
 		BatMap.foldi (fun ctor (arg_ty, parent_ty) acc ->
-			if (Type.equal arg_ty desired_type) then
+			if (Type.equal arg_ty desired_type) && (not (Type.equal Type._unit arg_ty)) then
 				BatSet.add (ctor, parent_ty) acc 
 			else acc 
 		) spec.vc BatSet.empty 
@@ -476,7 +473,8 @@ let synthesis spec =
 			let (ty_to_exprs', ty_to_sigs', sig_to_expr') = 
 				get_components_of_depth ~grow_funcs:[grow_unctor; grow_proj] spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)
 			in
-			if (BatMap.compare BatSet.compare ty_to_exprs' ty_to_exprs) = 0 then (ty_to_exprs, ty_to_sigs, sig_to_expr)
+			if (BatMap.compare BatSet.compare ty_to_exprs' ty_to_exprs) = 0 then 
+				(ty_to_exprs, ty_to_sigs, sig_to_expr)
 			else fix (depth + 1) (ty_to_exprs', ty_to_sigs', sig_to_expr')
 		in
 		fix 1 (ty_to_exprs, ty_to_sigs, sig_to_expr)

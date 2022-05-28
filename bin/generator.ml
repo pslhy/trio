@@ -94,7 +94,7 @@ let rec is_match_with_basecase e =
 						
 let is_rec_runnable spec e = 
 	match e with 
-	| Match (_, patterns) ->
+	| Match _ ->
 		(is_match_with_basecase e) 
 		&& 
 		(is_structurally_decreasing spec e)
@@ -129,10 +129,9 @@ let compute_signature ?(result_top=[]) spec input_values e =
 let concolic_eval spec upper_bound (orig_expr : t) (input : value) : t = 
 	if not (is_runnable spec orig_expr) then failwith "not runnable"
 	else 
-	let _ = my_prerr_endline ("concolic_eval: " ^ (show orig_expr) ^ " upper_bound : " ^ (string_of_int upper_bound)) in
+	(* let _ = my_prerr_endline ("concolic_eval: " ^ (show orig_expr) ^ " upper_bound : " ^ (string_of_int upper_bound)) in *)
 	(* let evaluated_so_far = ref BatSet.empty in  *) (* a temporary expediment to avoid non-termination, which is SO bad -- extremely expensive *)
 	(* let cnt = ref 0 in  *)
-	let prev_match = ref Wildcard in 
 	let rec concolic_eval_sub upper_bound e = 
 		(* let _ = 
 			incr cnt;
@@ -147,11 +146,11 @@ let concolic_eval spec upper_bound (orig_expr : t) (input : value) : t =
 			| _ -> size_of_expr e
 		in 
 		let is_recursive = (is_recursive e) && (not (is_match_exp e)) in
-		if (not is_recursive) && (upper_bound <= 0 || e_size > upper_bound) then 
-			failwith "concolic_eval: expression too big"
+		if (not is_recursive) && (upper_bound <= 0 || e_size > upper_bound) then Wildcard
+			(* failwith "concolic_eval: expression too big" *)
 		else 
-		let _ = if is_match_exp e && (Expr.equal !prev_match e) then failwith "concolic_eval: infinite loop" else () in
-		let _ = if is_match_exp e then prev_match := e else () in
+		(* let _ = if is_match_exp e && (Expr.equal !prev_match e) then failwith "concolic_eval: infinite loop" else () in
+		let _ = if is_match_exp e then prev_match := e else () in *)
 		let result = 
 			match e with
 			| App (Var i, e2) when (BatString.equal i target_func) ->
@@ -171,14 +170,24 @@ let concolic_eval spec upper_bound (orig_expr : t) (input : value) : t =
 					replace_expr src_exp e2 orig_expr |> concolic_eval_sub upper_bound
 				end
 			| App (e1, e2) ->
-				App (concolic_eval_sub (upper_bound - 1) e1, concolic_eval_sub (upper_bound - 1) e2)
+				let e1 = concolic_eval_sub (upper_bound - 1) e1 in
+				let e2 = concolic_eval_sub (upper_bound - 1) e2 in 
+				App (e1, e2)
+				(* begin 
+					match e1 with
+					| Func ((i,_),e1) ->
+						let e2 = concolic_eval_sub (upper_bound - 1) e2 in 
+						concolic_eval_sub (upper_bound - 1) (replace i e2 e1) 
+					| Wildcard -> Wildcard
+					| _ -> failwith "nonfunc applied"
+				end *)
 			| Eq (b,e1,e2) ->
 				Eq (b, concolic_eval_sub (upper_bound - 2) e1 , concolic_eval_sub (upper_bound - 2) e2)
 			| Func (a,e) -> Func(a, concolic_eval_sub (upper_bound - 2) e) 
 			| Ctor (i,e) ->
 				Ctor (i, concolic_eval_sub (upper_bound - 2) e) 
 			| Match (e,branches) as match_expr ->
-				let v = evaluate (replace target_func_arg (exp_of_value input) e) in
+				let v = (replace target_func_arg (exp_of_value input) e) |> replace_holes spec.ec |> evaluate in
 				let bindings_branchexp_opt : ((string * value) list * t) option list =
 					List.map (fun (p,branch_e) ->
 						try 
@@ -194,7 +203,8 @@ let concolic_eval spec upper_bound (orig_expr : t) (input : value) : t =
 						List.find BatOption.is_some bindings_branchexp_opt |> BatOption.get
 				in
 				concolic_eval_sub upper_bound branch_e 
-			| Fix _ -> assert false 
+			| Fix _  -> assert false 
+				(* concolic_eval_sub upper_bound (replace i e e') *)
 			| Tuple es ->
 				Tuple (List.map (fun e' -> concolic_eval_sub (upper_bound - 1) e') es)
 			| Proj (i,e) ->
@@ -403,7 +413,7 @@ let grow_unctor desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 		let e = List.hd instances in
 		let ty = Typecheck.typecheck_exp spec.ec spec.tc spec.td spec.vc e in    
 		BatMap.foldi (fun i (arg_ty, parent_ty) acc ->
-			if (Type.equal ty parent_ty) then
+			if (Type.equal ty parent_ty) && not (Type.equal Type._unit arg_ty) then
 				let e = normalize (Unctor (i, e)) in
 				e :: acc  
 			else acc 

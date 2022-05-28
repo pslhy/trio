@@ -14,6 +14,21 @@ struct
     | Wildcard
   [@@deriving eq,ord,show]
 
+	let my_compare t1 t2 vc = 
+		(* sort patterns so that base case can be processed first *)
+		match t1, t2 with 
+		| _, Wildcard -> 1 
+		| Wildcard, _ -> -1 
+		| Ctor (i1, _), Ctor (i2, _) -> 
+			(
+			try 
+				let (arg_ty1, _) = BatMap.find i1 vc in 
+				let (arg_ty2, _) = BatMap.find i2 vc in 
+				Type.compare arg_ty1 arg_ty2
+			with _ -> failwith "Pattern.compare: something's wrong with vc!"
+			)
+		| _ -> Stdlib.compare t1 t2 
+
   let rec contains_id (i:string) (p:t) : bool =
     begin match p with
       | Tuple ps -> List.exists (contains_id i) ps
@@ -65,7 +80,7 @@ let destruct_tuple e =
 	Tuple es -> es 
 	| _ -> failwith "destruct_tuple: not a tuple"
 
-	let rec size_of_expr e =
+let rec size_of_expr e =
 	match e with
 	| Var _ -> 1
   | Wildcard -> 1
@@ -74,8 +89,8 @@ let destruct_tuple e =
   | Ctor (_, e') -> (size_of_expr e') + 2
   | Unctor (_, e') -> (size_of_expr e') + 2
   | Eq (_, e1, e2) -> (size_of_expr e1) + (size_of_expr e2) + 2
-  | Match (_, patterns) -> 
-		List.fold_left (fun acc (_, e') -> acc + (size_of_expr e') + 1) 0 patterns
+  | Match (e, patterns) -> 
+		List.fold_left (fun acc (_, e') -> acc + (size_of_expr e') + 1) ((size_of_expr e) + 1) patterns
   | Fix (_, _, e') -> (size_of_expr e') + 3 
   | Tuple es -> List.fold_left (fun acc e' -> acc + (size_of_expr e')) 1 es 
   | Proj (_, e') -> (size_of_expr e') + 2
@@ -110,13 +125,30 @@ let rec count_recursions e =
 	| Proj (_, e) -> (count_recursions e) 
 	| _ -> 0 	
 
+
+let rec cost_of_expr_with_input ?(in_list=[2.5;6.1;1.4;2.2;8.8;1.3;1.3;3.8;4.5;6.2;6.5;4.0]) e =
+	match e with
+	| Var _ -> (List.nth in_list 0)
+	| Wildcard -> (List.nth in_list 1)
+	| App (e1, e2) -> if (count_recursions e) < 1 then (cost_of_expr_with_input e1 ~in_list:in_list) +. (cost_of_expr_with_input e2 ~in_list:in_list) +. (List.nth in_list 2)
+										else (cost_of_expr_with_input e1 ~in_list:in_list) +. (cost_of_expr_with_input e2 ~in_list:in_list) +. (List.nth in_list 3)
+	| Func (p, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 4)
+	| Ctor (i, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 5)
+	| Unctor (i, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 6)
+	| Eq (b, e1, e2) -> (cost_of_expr_with_input e1 ~in_list:in_list) +. (cost_of_expr_with_input e2 ~in_list:in_list) +. (List.nth in_list 7)
+	| Match (e', patterns) ->
+		List.fold_left (fun acc (pat, e') -> acc +. (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 8)) 0. patterns
+	| Fix (_, _, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 9)
+	| Tuple es -> List.fold_left (fun acc e' -> acc +. (cost_of_expr_with_input e' ~in_list:in_list)) (List.nth in_list 10) es
+	| Proj (_, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 11)
+
 (* score *)
 let rec cost_of_expr e =
   match e with
-  | Var _ -> 1
-  | Wildcard -> 1
+  | Var _ -> 0
+  | Wildcard -> 100
   | App (e1, e2) -> if (count_recursions e) < 1 then (cost_of_expr e1) + (cost_of_expr e2) + 1
-										else (cost_of_expr e1) + (cost_of_expr e2) - 2
+										else (cost_of_expr e1) + (cost_of_expr e2) - 300
   | Func (p, e') -> (cost_of_expr e') + 1
   | Ctor (i, e') -> (cost_of_expr e') + 2
   | Unctor (i, e') -> (cost_of_expr e') + 2
@@ -124,7 +156,10 @@ let rec cost_of_expr e =
   | Match (e', patterns) ->
     List.fold_left (fun acc (pat, e') -> acc + (cost_of_expr e') + 1) 0 patterns
   | Fix (_, _, e') -> (cost_of_expr e') - 1
-  | Tuple es -> List.fold_left (fun acc e' -> acc + (cost_of_expr e')) 0 es
+  | Tuple es -> 
+		if BatList.is_empty es then 100
+		else 
+			List.fold_left (fun acc e' -> acc + (cost_of_expr e')) 1 es
   | Proj (_, e') -> (cost_of_expr e') + 1
 			 
 let ekind_of_expr expr = 
@@ -460,11 +495,14 @@ let rec get_scrutinees e =
 
 let rec get_recursive_calls e = 
 	match e with 
-  | App (e1, e2) -> 
-		if (contains_id target_func e1) then 
+  | App (Var i, _) when (BatString.equal i target_func) ->
+		BatSet.singleton e 
+	| App (e1, e2) -> 
+		BatSet.union (get_recursive_calls e1) (get_recursive_calls e2)  
+		(* if (contains_id target_func e1) then 
 			BatSet.add e (get_recursive_calls e2) 
 		else 
-			(get_recursive_calls e2) 
+			(get_recursive_calls e2)  *)
   | Func (_, e) -> get_recursive_calls e
   | Ctor (_, e) -> get_recursive_calls e
   | Unctor (_, e) -> get_recursive_calls e

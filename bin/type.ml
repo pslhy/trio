@@ -7,6 +7,13 @@ type t =
   | Variant of (string * t) list (* e.g., [ ("O", Tuple []) ; ("S", Named "nat") ] *)
 [@@deriving eq, ord, show]
 
+let compare t1 t2 = 
+	(* unit type is the smallest one *)
+	match t1, t2 with 
+	Tuple [], _ -> -1
+	| _, Tuple [] -> 1 
+	| _ -> compare t1 t2 
+
 let rec show t = 
 	match t with 
 	| Named i -> i 

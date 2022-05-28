@@ -25,20 +25,34 @@ struct
 	let compare t1 t2 = 
 		let (e1, subgoals_info1) = t1 in 
 		let (e2, subgoals_info2) = t2 in 
-		(* let e1_size = Expr.size_of_expr e1 in 
-		let e2_size = Expr.size_of_expr e2 in  *)
+		let e1_size = Expr.size_of_expr e1 in 
+		let e2_size = Expr.size_of_expr e2 in 
 		let e1_height = Expr.height_of_expr e1 in 
 		let e2_height = Expr.height_of_expr e2 in 
+		(* let e1_score = cost_of_expr_with_input e1 in 
+		let e2_score = cost_of_expr_with_input e2 in  *)
+		
 		(* fewer holes 
 			 shorter height
 			 smaller size *)
 		let n_subgoals1 = List.length subgoals_info1 in 
 		let n_subgoals2 = List.length subgoals_info2 in 
-		if n_subgoals1 <> n_subgoals2 then n_subgoals1 - n_subgoals2
-		else 
-			if e1_height <> e2_height then e1_height - e2_height
+
+		let e1_score = cost_of_expr e1 in 
+		let e2_score = cost_of_expr e2 in 
+
+		
+		
+			if n_subgoals1 <> n_subgoals2 then n_subgoals1 - n_subgoals2 
 			else 
-				Expr.compare e1 e2
+				if e1_score <> e2_score then e1_score - e2_score
+				(* if e1_score <> e2_score then ceil (e1_score -. e2_score) |> int_of_float *)
+				else 
+				(* if e1_size <> e1_size then e1_size - e2_size 
+				else 
+					if e1_height <> e2_height then e1_height - e2_height
+					else  *)
+						Stdlib.compare e1 e2
 
 end
 
@@ -84,14 +98,14 @@ and learn candidate addr available_uncons pts spec (desired_sig, desired_type) (
 		try 
 			BatMap.find desired_type ty_to_sigs
 			|> BatSet.filter (fun sg -> 
-					let sg_pts = elems_of_indices pts sg in
-					let desired_sig_pts_size = List.length desired_sig_pts in
-					let sg_pts_size = List.length sg_pts in
-					if desired_sig_pts_size = sg_pts_size then
+					(* let sg_pts = elems_of_indices pts sg in *)
+					(* let desired_sig_pts_size = List.length desired_sig_pts in *)
+					(* let sg_pts_size = List.length sg_pts in *)
+					(* if desired_sig_pts_size = sg_pts_size then *)
 						(* to support learn_proj, wildcard can be matched with anything *)
 						(* List.for_all2 (fun v1 v2 -> (equal_value v1 v2) || (is_wildcard_value v1) || (is_wildcard_value v2)) desired_sig_pts sg_pts *)
-						equal_signature (elems_of_indices pts sg) desired_sig_pts
-					else false
+					equal_signature (elems_of_indices pts sg) desired_sig_pts
+					(* else false *)
 				)  
 		with _ -> BatSet.empty 
 	in
@@ -101,16 +115,19 @@ and learn candidate addr available_uncons pts spec (desired_sig, desired_type) (
 			(* if the candidate contains (or may contain in the future) recursive calls, must use all possible components 
 				 any wildcard (hole) can be filled with a recursive call. so all candidates are targets *)
 			(* if (is_recursive candidate) then  *)
-				BatMap.foldi (fun sg expr acc -> 
-					if (BatSet.mem sg sigs) && (using_allowed_unconstructor expr available_uncons) then 
+				
+				BatSet.fold (fun sg acc -> 
+					let expr = try BatMap.find sg sig_to_expr with _ -> assert false in
+					if (using_allowed_unconstructor expr available_uncons) then 
 						let plugged = plug candidate (addr, expr) in 
 						let _ = my_prerr_endline (Printf.sprintf "direct: plugging %s into %s and obtain %s" (Expr.show expr) (Expr.show candidate) (Expr.show plugged)) in 
 						BatSet.add (plugged, []) acc
-					else acc 
-				) sig_to_expr BatSet.empty 	
-			(* otherwise, choose the smallest component *)
-			(* else
-				let expr = 
+					else acc
+				) sigs BatSet.empty 
+			
+				(* otherwise, choose the smallest component *)
+			(* else *)
+				(* let expr = 
 					let init_expr = BatMap.find (BatSet.choose sigs) sig_to_expr in 
 					BatSet.fold (fun sg min_expr -> 
 						let expr = BatMap.find sg sig_to_expr in 
@@ -258,6 +275,7 @@ and learn_tuple candidate addr available_uncons pts spec (desired_sig, desired_t
 		in
 		let _ = assert ((BatSet.cardinal tuple_lens) = 1) in 
 		let tuple_len = BatSet.choose tuple_lens in
+		(* unit value *)
 		if tuple_len = 0 then 
 			BatSet.empty
 		else 
@@ -271,7 +289,7 @@ and learn_tuple candidate addr available_uncons pts spec (desired_sig, desired_t
 								match v with 
 								| TupleV vs -> List.nth vs i 
 								| _ -> assert false
-							else v    
+							else v (* doesn't care. just placeholder *)   
 						) desired_sig
 					in
 					let desired_type' = List.nth (Type.destruct_tuple desired_type) i in 
@@ -323,7 +341,8 @@ and learn_proj candidate addr available_uncons pts spec (desired_sig, desired_ty
 		let sg_pts = (elems_of_indices pts sg) in
 		(* only consider components whose outputs are tuples 
 			 (e_1, e_2, ..., e_k).i is pointless   *)
-		if not (List.for_all is_tuple_value sg_pts) || (is_tuple_exp expr) then result
+		if not (List.for_all is_tuple_value sg_pts) || (is_tuple_exp expr) 
+			|| not (using_allowed_unconstructor expr available_uncons) then result
 		else 
 			(* get length of tuples which are outputs of the currently considered component *)
 			let tuple_len =
@@ -342,6 +361,7 @@ and learn_proj candidate addr available_uncons pts spec (desired_sig, desired_ty
 			(* the output is unit. ignore this component *)
 			if tuple_len = 0 then result 
 			else 
+				(* for i in 0 .. n-1, see if expr.i solves the subproblem. then each expr.i is a subsolution *)
 				List.fold_left (fun result i ->
 					let sg_pts_proj_i =
 						List.map (fun v -> match v with TupleV vs -> List.nth vs i | _ -> assert false) sg_pts 
@@ -383,6 +403,7 @@ let branching_infos =
 		| Type.Named i ->
 			let resolved_ty = try BatMap.find i spec.td with _ -> prerr_endline i; assert false in 
 			if (Type.is_variant_type resolved_ty) then
+				let n_variants = Type.destruct_variant resolved_ty |> List.length in
 				BatSet.fold (fun sg branching_infos ->
 					let scrutinee = try BatMap.find sg sig_to_expr with _ -> assert false in
 					(* invalid scrutinee that uses unallowed unconstructors or of recursive call *)
@@ -407,10 +428,14 @@ let branching_infos =
 							in
 							BatMap.foldi (fun pat pts branches ->
 								branches @ [(pat, pts)]   
-							) pat2pts []    
+							) pat2pts []
 						in
-						(* scrutinee should cover multiple constructors, i.e., branches *)
-						if (List.length branches) > 1 then
+						(* sort branches *)
+						let branches =
+							BatList.fast_sort (fun (pat1, _) (pat2, _) ->  Pattern.my_compare pat1 pat2 spec.vc) branches
+						in 
+						(* scrutinee should cover all constructors, i.e., branches *)
+						if (List.length branches) = n_variants then
 							BatSet.add (scrutinee, branches) branching_infos	  
 						else branching_infos
 				) sigs branching_infos 
@@ -433,7 +458,7 @@ BatSet.fold (fun (scrutinee, branches) result ->
 			in
 			match pat with 
 			| Pattern.Ctor (i, _) ->
-				(* TODO : for base cases, ensure no recursive calls *)
+				(* TODO : for base cases, ensure no recursive calls - 자동으로 그렇게 되는거 아닌가? (그 다음 learn 에서 component 로 solve)*)
 				let available_uncons = BatSet.add (Unctor(i, scrutinee)) available_uncons in
 				(* ind + 1 because 0 is reserved for scrutinee *)
 				let addr' = addr @ [ind + 1] in 
@@ -457,6 +482,225 @@ and learn_app candidate addr available_uncons pts spec (desired_sig, desired_typ
 	let input_ty = fst spec.synth_type in
 	let outputs = List.map snd spec.spec in
 	let output_ty = snd spec.synth_type in
+	(* let _ = my_prerr_endline (Printf.sprintf "learn_app using components") in *)
+	let arg_tys =
+		match input_ty with
+		| Type.Tuple ts -> ts
+		| _ -> [input_ty]
+	in
+	let scrutinees = get_scrutinees candidate in
+	(* let _ = my_prerr_endline (Printf.sprintf "scrutinees : %s" (string_of_set show scrutinees)) in *)
+	(* conditions for termination guarnatee: 
+			1) arguments should contain x, 
+			2) no constructors 
+			3) at least one unconstructor
+			4) not a scrutinee of some match expr *)
+	
+	(* list of all possible arg expressions 
+			(TODO: avoid combination explosion via generator) *)
+	
+	let rec_call_exprs = 
+		let f_arg_exprs_list : Expr.t list list =
+			List.map (fun arg_ty ->
+				BatMap.find arg_ty ty_to_exprs
+				|> BatSet.filter (contains_id target_func_arg)
+				|> BatSet.filter (fun e -> (BatSet.is_empty (get_constructors e)))
+				|> BatSet.filter (fun e -> using_allowed_unconstructor e available_uncons)
+				|> BatSet.filter (fun e -> 
+						(not (BatSet.is_empty (get_unconstructors e))) || 
+						(match e with 
+						| Tuple es -> 
+							(* to avoid 
+								match (x).0 with
+								Cons(_) -> (f ((x).0, (x).0))
+								Nil(_) -> _ 
+
+								but the following is okay (because it involves an unconstructor)
+								(match Un_Cons x . 1 with
+									| Nil _ -> Some (Un_Cons x . 0)
+									| Cons _ -> f (Un_Cons x . 1))
+
+								*)
+							not (List.exists (fun e -> BatSet.mem e scrutinees) es)
+						| _ -> 
+							not (BatSet.mem e scrutinees)
+						)
+					)
+				|> BatSet.elements 
+			) arg_tys
+			|> BatList.n_cartesian_product
+		in
+		List.fold_left (fun result arg_exprs -> 
+			let arg_expr = 
+				if List.length arg_exprs = 1 then List.hd arg_exprs 
+				else Tuple arg_exprs
+			in
+			let ekind = App(Var target_func, arg_expr) in 
+			ekind :: result
+		) [] f_arg_exprs_list 
+	in
+	let _= my_prerr_endline (Printf.sprintf "rec_call_exprs : %s" (string_of_list Expr.show rec_call_exprs)) in
+	let result_rec = 
+		if not (Type.equal output_ty desired_type) then BatSet.empty
+		else
+			(* there are some arguments violating the above conditions; skip *)
+			if BatList.is_empty rec_call_exprs then 
+				let _ = my_prerr_endline (Printf.sprintf "no components usable for arguments") in
+				BatSet.empty
+			else
+				List.fold_left (fun result call_expr -> 
+					let plugged = plug candidate (addr, call_expr) in 
+					BatSet.add (plugged, []) result 
+				) BatSet.empty rec_call_exprs 
+	in
+	let result_lib = 
+		let top = BatList.make (List.length desired_sig) WildcardV in 
+		(* BatSet.empty *)
+		(* for each function expression component whose result type is desired_type, 
+		   get all possible argument expressions (components + recursive calls)
+			 filter out exprs which do not comply with the library
+			 *)
+		BatMap.foldi (fun fun_ty fun_sigs result -> 
+			if not (Type.is_arrow_type fun_ty) then result
+			else
+				let (arg_ty, result_ty) = Specification.st_to_pair fun_ty in 
+				if not (Type.equal result_ty desired_type) then result
+				else
+					let arg_tys = 
+						let _ = assert (Type.equal result_ty desired_type) in 
+						match arg_ty with
+						| Type.Tuple ts -> ts
+						| _ -> [arg_ty]
+					in
+					BatSet.fold (fun fun_sig result -> 
+						(* recursive call *)
+						if (equal_signature fun_sig top) then result
+						else 
+						let fun_expr = try BatMap.find fun_sig sig_to_expr with _ -> assert false in
+						let arg_exprs_before_cartesian = 
+							BatList.mapi (fun arg_index arg_ty ->
+								let arg_sigs = try BatMap.find arg_ty ty_to_sigs with _ -> BatSet.empty in
+								let arg_exprs = 
+									BatSet.fold (fun arg_sig arg_exprs -> 
+										let arg_expr = try BatMap.find arg_sig sig_to_expr with _ -> assert false in
+										let okay = 
+											(not (is_app_exp arg_expr)) &&
+											(using_allowed_unconstructor arg_expr available_uncons) &&
+											List.for_all (fun pt -> 
+												let desired_output = List.nth desired_sig pt in 
+												let arg_output = List.nth arg_sig pt in
+												let funcv = (List.nth fun_sig pt) in 
+												if (BatMap.mem desired_output !Tracelearner.library) then 
+													(* library: value -> (closure * fun_type * (arg value list)) list) *)
+													let funv_ty_argvs = BatMap.find desired_output !Tracelearner.library in 
+													List.exists (fun (funcv', fun_ty', argvs) ->  
+														(Type.equal fun_ty' fun_ty) && (Expr.equal_value funcv' funcv) &&
+														(Expr.equal_value (List.nth argvs arg_index) arg_output)
+													) funv_ty_argvs
+												else false 
+											) pts 
+										in
+										if okay then 
+											arg_expr :: arg_exprs 
+										else arg_exprs 
+									) arg_sigs []
+								in 
+								if (Type.equal output_ty arg_ty) then
+									arg_exprs @ rec_call_exprs
+								else arg_exprs
+							) arg_tys
+						in 
+						let arg_exprs_list = BatList.n_cartesian_product arg_exprs_before_cartesian in 
+						List.fold_left (fun result arg_exprs -> 
+							let isrec, ekind = 
+								List.fold_left (fun (is_rec, expr) arg_expr -> 
+									let is_rec = is_rec || (is_recursive arg_expr) in
+									(is_rec, App(expr, arg_expr))
+								) (false, fun_expr) arg_exprs 
+							in 
+							if isrec || 
+							  (let sg = compute_signature spec inputs ekind in 
+								 equal_signature (elems_of_indices pts sg) desired_sig_pts) then 
+								let plugged = plug candidate (addr, ekind) in 
+								BatSet.add (plugged, []) result
+							else result 
+						) result arg_exprs_list
+					) fun_sigs result 
+		) ty_to_sigs BatSet.empty  
+	in
+	BatSet.union result_rec result_lib
+
+
+(* 
+
+		(* desired_fun_argvs : for each desired output o_i, triple of (f, fun_ty, v1...vk) s.t. (..(f v1)..vk)..) = o_i *)		
+		let desired_fun_argvs_lst = 
+			BatList.mapi (fun i output -> 
+				if (BatList.mem i pts) && (BatMap.mem output !Tracelearner.library) then 
+					BatMap.find output !Tracelearner.library
+				else 
+					(* dummy for cartesian product computation *)
+					[(WildcardV, Type._unit, [WildcardV])]
+			) desired_sig
+			|> BatList.n_cartesian_product
+		in 
+		List.fold_left (fun result desired_fun_argvs -> 
+			let _ = assert ((List.length desired_fun_argvs) = List.length desired_sig) in
+			(* desired_fun_argvs : for each desired output o_i, triple of (f, fun_ty, v1...vk) s.t. (..(f v1)..vk)..) = o_i *)
+			let funcv_tys = 
+				List.fold_left (fun acc (funcv,fun_ty,_) -> 
+					if is_wildcard_value funcv then acc else BatSet.add (funcv,fun_ty) acc
+				) BatSet.empty desired_fun_argvs
+			in
+			let is_single_funv = (BatSet.cardinal funcv_tys) = 1 in 
+			if not is_single_funv then result
+			else 
+				let funcv, fun_ty = BatSet.choose funcv_tys in 
+				let funcv_sig = BatList.make (BatList.length desired_sig) funcv in 
+				let _ = assert (BatMap.mem funcv_sig sig_to_expr) in 
+				let fun_expr = BatMap.find funcv_sig sig_to_expr in
+				let (arg_ty, result_ty) = Specification.st_to_pair fun_ty in 
+				let arg_tys = 
+					let _ = assert (Type.equal result_ty desired_type) in 
+					match arg_ty with
+					| Type.Tuple ts -> ts
+					| _ -> [arg_ty]
+				in
+				(* type subgoal = points * signature * Type.t  *)
+				(* type t = Expr.t * (addr * available_uncons * subgoal) list  *)
+				let plugged = 
+					let ekind = List.fold_left (fun acc _ -> App(acc, Wildcard)) Wildcard arg_tys in 
+					plug candidate (addr, ekind) 
+				in 
+				let addrs = 
+					List.fold_left (fun acc _ ->  
+						(* App(App(App(f,a1),a2),a3)  
+						[0;0;0] [0;0;1] [0;1] [1] *)
+						(List.map (fun lst -> 0::lst) acc) @ [[1]]
+					) [ addr@[0] ; addr@[1] ] (List.tl arg_tys) in
+				let _,hole_infos = 
+					let funcv_hole_info = 
+						(List.hd addrs, available_uncons, (pts, BatList.make (List.length desired_sig) funcv, fun_ty))
+					in
+					List.fold_left (fun (arg_index, hole_infos) arg_addr -> 
+						let desired_sig' = 
+							List.fold_left (fun acc (funcv,_,args) -> 
+								if is_wildcard_value funcv then acc @ [WildcardV] 
+								else 
+									let _ = assert ((List.length args) > arg_index) in 
+									acc @ [List.nth args arg_index]
+							) [] desired_fun_argvs 
+						in 
+						let desired_type' = List.nth arg_tys arg_index in 
+						let hole_info = (arg_addr, available_uncons, (pts, desired_sig', desired_type')) in
+						(arg_index + 1, hole_infos @ [hole_info])
+					) (0, [funcv_hole_info]) (List.tl addrs)
+				in 
+				BatSet.add (plugged, hole_infos) result  
+		) BatSet.empty desired_fun_argvs_lst 
+	in  *)
+
+(* 
 	let result_rec = 
 		(* spec: [Nil] -> 0,  [Cons(0,Nil)] -> 1, [Cons(0,Cons(0,Nil))] -> 2 *)
 		(* if desired_sig_pts = [_, 0, 1] *)
@@ -737,7 +981,7 @@ and learn_app candidate addr available_uncons pts spec (desired_sig, desired_typ
 		) pts *)
 	in
 	(* let vsa_lib = intersect_vsa_list vsas_lib in *)
-	BatSet.union result_rec result_lib
+	BatSet.union result_rec result_lib *)
 
 let update_heap available_depth candidate_info heap spec (desired_sig, desired_type) (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 	let next_candidate_infos = 
@@ -770,8 +1014,8 @@ let update_heap available_depth candidate_info heap spec (desired_sig, desired_t
 				let new_hole_infos = hole_infos @ hole_infos' in 
 				let can_be_added = 
 					(* if not recursive or no holes to be filled, no need to do symbolic execution 
-						 for now, symexec can determine non-termination, so let it be *)
-					if (not (is_recursive next_candidate)) (*|| (BatList.is_empty new_hole_infos)*) then true
+						 *)
+					if !Options.no_filter || (not (is_recursive next_candidate)) || (BatList.is_empty new_hole_infos) then true
 					else 
 						let inputs = List.map fst spec.spec in
 						let _ = 
@@ -781,7 +1025,7 @@ let update_heap available_depth candidate_info heap spec (desired_sig, desired_t
 							let filter_fun = if !Options.trace_complete then BatList.for_all else BatList.exists in 
 							filter_fun
 							 (fun pt -> 
-								let _ = my_prerr_endline (Printf.sprintf "input [%d]" pt) in
+								(* let _ = my_prerr_endline (Printf.sprintf "input [%d]" pt) in *)
 								let trace_vsa = (List.nth !trace_vsas pt) in
 								let input = List.nth inputs pt in 
 								let upper_bound = 
@@ -793,7 +1037,7 @@ let update_heap available_depth candidate_info heap spec (desired_sig, desired_t
 								in 
 								try
 									let trace_expr = 
-										let next_candidate = replace_holes spec.ec next_candidate in
+										(* let next_candidate = replace_holes spec.ec next_candidate in *)
 										concolic_eval spec upper_bound next_candidate input 
 									in 
 									let _ = 
@@ -812,6 +1056,7 @@ let update_heap available_depth candidate_info heap spec (desired_sig, desired_t
 						feasible
 				in
 				if can_be_added then 
+					let new_hole_infos = BatList.fast_sort (fun (addr1,_,_) (addr2,_,_) -> Stdlib.compare addr1 addr2) new_hole_infos in 
 					BatSet.add (next_candidate, new_hole_infos) next_candidate_infos 
 				else next_candidate_infos
 			) expanded_result BatSet.empty 
@@ -874,25 +1119,27 @@ let synthesis spec =
 	let ty_to_sigs = BatMap.empty in 
 	let sig_to_expr = BatMap.empty in
 	(* collect exprs for "variables" *)
-	let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
+	(* let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
 		let rec fix depth (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
 			let (ty_to_exprs', ty_to_sigs', sig_to_expr') = 
 				get_components_of_depth ~grow_funcs:[grow_unctor; grow_proj] spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)
 			in
-			if (BatMap.compare BatSet.compare ty_to_exprs' ty_to_exprs) = 0 || depth > !Options.max_match_depth then (ty_to_exprs, ty_to_sigs, sig_to_expr)
+			if (BatMap.compare BatSet.compare ty_to_exprs' ty_to_exprs) = 0 || depth >= !Options.max_match_depth then (ty_to_exprs, ty_to_sigs, sig_to_expr)
 			else fix (depth + 1) (ty_to_exprs', ty_to_sigs', sig_to_expr')
 		in
 		fix 1 (ty_to_exprs, ty_to_sigs, sig_to_expr)
-	in
+	in *)
 	let rec iter depth (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 		(* clean up caches *)
 		let _ = init () in
 		let _ = 
-			if depth > (BatInt.pow 2 !Options.max_height) then 
+			if depth > !Options.max_height then 
 				failwith (Printf.sprintf "No solution within depth of %d." !Options.max_height) 
 		in
 		let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
 			get_components_of_depth spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)
+			(* no grow_app *)
+			(* get_components_of_depth ~grow_funcs:[grow_tuple; grow_proj; grow_ctor; grow_unctor; grow_eq] spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1) *)
 		in
 		if depth < !Options.init_comp_size then
 			iter (depth+1) (ty_to_exprs, ty_to_sigs, sig_to_expr)
@@ -905,7 +1152,7 @@ let synthesis spec =
 		in 
 		try
 			let sol =
-				main_loop spec (desired_sig, desired_ty) (ty_to_exprs, ty_to_sigs, sig_to_expr)					 
+				main_loop spec (desired_sig, desired_ty) (ty_to_exprs, ty_to_sigs, sig_to_expr)
 			in
 			wrap spec sol 
 		with NoSolInVSA -> (* no solution found *) 
