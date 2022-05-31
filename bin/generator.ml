@@ -18,8 +18,11 @@ let wrap spec e =
 		Func(p, e)
 	)
 	
-let compute_signature_simple spec e =
-	let input_values = List.map fst spec.spec in	 
+let compute_signature_simple ?(input_values=[]) spec e =
+	let input_values = 
+		if BatList.is_empty input_values then List.map fst spec.spec 
+		else input_values
+	in	 
 	let eval_context = spec.ec in
 	let result =  
 		(* make it a function call *)
@@ -45,22 +48,27 @@ let add_expr ty expr ty_to_exprs =
 let is_structurally_decreasing spec e =	 
 	let input_values = List.map fst spec.spec in
 	let rec_calls = get_recursive_calls e in
-	(* prerr_endline ("structurally decreasing? " ^ (Expr.show e)) ; *)
-	(* prerr_endline (string_of_set Expr.show rec_calls) ;           *)
+	(* prerr_endline ("structurally decreasing? " ^ (Expr.show e)) ;
+	prerr_endline (string_of_set Expr.show rec_calls) ; *)
 	BatSet.for_all (fun rec_call_exp ->
-		let arg_exps = get_args rec_call_exp in
+		let arg_exp = 
+			match rec_call_exp with 
+			| App (_, e) -> e
+			| _ -> assert false 
+		in
 		(* prerr_endline ("arg_exps " ^ (string_of_set Expr.show arg_exps)) ; *)
-		BatSet.for_all (fun arg_exp ->
+		(* BatList.for_all (fun (arg_exp, i) -> *)
+			(* no allowed: f (f ...) *)
 			if is_recursive arg_exp then 
 				false 
 			else 
       	let signature = compute_signature_simple spec arg_exp in
 				let decreasing = List.for_all2 lt_value signature input_values in
-				(* prerr_endline ("arg_exp: " ^ (Expr.show arg_exp)) ;                                       *)
-				(* prerr_endline ("signature: " ^ (string_of_list show_value signature)) ;                   *)
-				(* prerr_endline ("input_values: " ^ (string_of_list show_value input_values)) ;             *)
-				(* prerr_endline ("result < input_values: " ^ (string_of_bool decreasing));                  *)
-				(* prerr_endline ("contains_id: " ^ (string_of_bool (contains_id target_func_arg arg_exp))); *)
+				(* prerr_endline ("arg_exp: " ^ (Expr.show arg_exp)) ;                                      
+				prerr_endline ("signature: " ^ (string_of_list show_value signature)) ;                  
+				prerr_endline ("input_values: " ^ (string_of_list show_value input_values)) ;             
+				prerr_endline ("result < input_values: " ^ (string_of_bool decreasing));                 
+				prerr_endline ("contains_id: " ^ (string_of_bool (contains_id target_func_arg arg_exp))); *)
 				decreasing && (contains_id target_func_arg arg_exp)   
 			 
 			(* all constructor sub-expressions of arg_exp do not include target_func_arg *)
@@ -75,7 +83,7 @@ let is_structurally_decreasing spec e =
 			(* BatSet.exists (fun unconstructor ->           *)
 			(* 	(contains_id target_func_arg unconstructor) *)
 			(* ) unconstructors                              *)
-		) arg_exps
+		(* ) arg_exps *)
 	) rec_calls
 			
 
@@ -118,7 +126,7 @@ let compute_signature ?(result_top=[]) spec input_values e =
   			BatList.make (List.length input_values) WildcardV
   		else result_top
   	else  
-			compute_signature_simple spec e 
+			compute_signature_simple ~input_values:input_values spec e 
 	in
 	(* let _ =                                                                                                   *)
 	(* 	my_prerr_endline (Printf.sprintf "[[ %s ]] = %s" (Expr.show e) (string_of_list Expr.show_value result)) *)
@@ -266,7 +274,7 @@ let is_solution desired_sig signature e =
 	(equal_signature desired_sig signature)
  
 (* result_ty_arg_tys_arg_expss_set: set of (result_type, possible arg types, list of possible arg expressions ) *)
-let grow 
+let grow target_size
 			desired_sig spec 
 			(result_ty_arg_tys_arg_expss_set : (Type.t * (Type.t list) * (Expr.t list) list) BatSet.t) 
 			(plug: Expr.t list -> Expr.t list) (* argument expressions -> final expressions *)
@@ -297,8 +305,7 @@ let grow
 						(* let _ = prerr_endline ("candidate : " ^ (Expr.show e)) in   *)
 						let result_ty = Typecheck.typecheck_exp spec.ec spec.tc spec.td spec.vc e in
 						(* do not generate recursive call expressions as components *)
-						if not (is_recursive e) then 
-						begin    
+						(* if not (is_recursive e) then  *)
     				let signature = 
     					compute_signature ~result_top:result_top spec input_values e
     				in
@@ -313,30 +320,35 @@ let grow
 							let new_sig = not (BatSet.mem signature sigs) in 
 							(* let runnable = not (equal_signature signature result_top) in  *)
 							let invalid = (equal_signature signature result_bot) in
-							(* let is_rec = is_recursive e in                     *)
-							(* let decreasing = is_structurally_decreasing spec e in *)
+							let is_rec = is_recursive e in                    
+							let decreasing = is_structurally_decreasing spec e in
       				(* if (new_sig || not_runnable) && (not invalid) && (terminating) then *)
-							(* let _ =                                                                    *)
-							(* 	if (is_recursive e) then                                                 *)
-							(* prerr_endline ("expr : " ^ (Expr.show e));                            
-							prerr_endline ("signature : " ^ (string_of_signature signature));              
-							prerr_endline ("new_sig? : " ^ (string_of_bool new_sig));
-							prerr_endline ("invalid? : " ^ (string_of_bool invalid));               *)
-							(* 		prerr_endline ("is_recursive : " ^ (string_of_bool (is_recursive e))); *)
-							(* 		prerr_endline ("decreasing : " ^ (string_of_bool decreasing))          *)
-							(* 		)                                                                      *)
-							(* in                                                                         *)
-							(* if new_sig && ((not (is_recursive e)) || decreasing) && (not invalid) then *)
-							if new_sig && (not invalid) then 
-      				begin
-      					ty_to_exprs_ref := add_expr result_ty e !ty_to_exprs_ref;
-								(* if runnable then *)
-								begin  
-      						ty_to_sigs_ref := add_signature result_ty signature !ty_to_sigs_ref;
+							(* let _ =                                                                    
+								if (is_recursive e) then (
+									prerr_endline ("expr : " ^ (Expr.show e));                            
+									prerr_endline ("signature : " ^ (string_of_signature signature));              
+									prerr_endline ("new_sig? : " ^ (string_of_bool new_sig));
+									prerr_endline ("invalid? : " ^ (string_of_bool invalid));              
+									prerr_endline ("is_recursive : " ^ (string_of_bool (is_recursive e)));
+									prerr_endline ("decreasing : " ^ (string_of_bool decreasing))         
+								)                                                                     
+							in  *)
+							(* if component is new, or recursive and structurally decreasing 
+								 for recursive components, ty_to_sigs and sig_to_expr are meaningless
+								  *)
+							if (Expr.size_of_expr e) > target_size then ()
+							else if is_rec then (
+								if decreasing then 
+									ty_to_exprs_ref := add_expr result_ty e !ty_to_exprs_ref;
+							)
+							else (
+								if new_sig && (not invalid) then 
+      					(
+      						ty_to_exprs_ref := add_expr result_ty e !ty_to_exprs_ref;
+									ty_to_sigs_ref := add_signature result_ty signature !ty_to_sigs_ref;
 									sig_to_expr_ref := BatMap.add signature e !sig_to_expr_ref 
-								end
-      				end
-						end
+								)
+							)
 					) (plug instances)
   			done
   		with BatEnum.No_more_elements -> ()
@@ -344,7 +356,7 @@ let grow
 	(!ty_to_exprs_ref, !ty_to_sigs_ref, !sig_to_expr_ref) 
 	
 	
-let grow_app desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
+let grow_app target_size desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 	(* set of (result_type, possible arg types) *)
 	let result_ty_arg_tys_arg_expss_set : (Type.t * (Type.t list) * (Expr.t list) list) BatSet.t =
 		BatMap.foldi (fun ty _ acc -> 
@@ -365,7 +377,10 @@ let grow_app desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 		let arg_exps = (List.tl instances) in
 		(* target function : argument is a single pair *)
 		if Expr.equal fun_exp (Var target_func) then 
-			[App (fun_exp, Tuple arg_exps)]
+			if (List.length arg_exps) = 1 then 
+				[App (fun_exp, List.hd arg_exps)]
+			else
+				[App (fun_exp, Tuple arg_exps)]
 		else 
 			[List.fold_left (fun acc e -> App (acc, e)) fun_exp arg_exps]
 		(* let (e1, e2) = (List.nth instances 0, List.nth instances 1) in 
@@ -375,10 +390,10 @@ let grow_app desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 			[App (e1, e2)]  *)
 		(* [App (e1, e2)] 	 *)
 	in
-	grow desired_sig spec result_ty_arg_tys_arg_expss_set plug (ty_to_exprs, ty_to_sigs, sig_to_expr) 
+	grow target_size desired_sig spec result_ty_arg_tys_arg_expss_set plug (ty_to_exprs, ty_to_sigs, sig_to_expr) 
 				
 
-let grow_ctor desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
+let grow_ctor target_size desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
   (* set of (result_type, possible arg types) *)
 	let result_ty_arg_tys_arg_expss_set : (Type.t * (Type.t list) * (Expr.t list) list) BatSet.t =
 		BatMap.foldi (fun _ (arg_ty, parent_ty) acc ->
@@ -396,10 +411,10 @@ let grow_ctor desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 			else acc 
 		) spec.vc []  
 	in
-	grow desired_sig spec result_ty_arg_tys_arg_expss_set plug (ty_to_exprs, ty_to_sigs, sig_to_expr) 	
+	grow target_size desired_sig spec result_ty_arg_tys_arg_expss_set plug (ty_to_exprs, ty_to_sigs, sig_to_expr) 	
 
 
-let grow_unctor desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
+let grow_unctor target_size desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 	(* set of (result_type, possible arg types) *)
 	let result_ty_arg_tys_arg_expss_set : (Type.t * (Type.t list) * (Expr.t list) list) BatSet.t =
 		BatMap.foldi (fun _ (arg_ty, parent_ty) acc ->
@@ -419,15 +434,15 @@ let grow_unctor desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 			else acc 
 		) spec.vc []  
 	in
-	grow desired_sig spec result_ty_arg_tys_arg_expss_set plug (ty_to_exprs, ty_to_sigs, sig_to_expr) 	
+	grow target_size desired_sig spec result_ty_arg_tys_arg_expss_set plug (ty_to_exprs, ty_to_sigs, sig_to_expr) 	
 
 
-let grow_eq desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
+let grow_eq target_size desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 	(ty_to_exprs, ty_to_sigs, sig_to_expr)
 
 exception SynthMatchFailure 
 
-let grow_match desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
+let grow_match target_size desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 	(* (ty_to_exprs, ty_to_sigs, sig_to_expr) *)
 	let ty = snd spec.synth_type in
 	(* let sigs = try BatMap.find ty ty_to_sigs with _ -> BatSet.empty in    *)
@@ -533,7 +548,7 @@ let grow_match desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 		in
 		[Match (scrutinee, branches) ]
 	in
-	grow desired_sig spec result_ty_arg_tys_arg_expss_set plug (ty_to_exprs, ty_to_sigs, sig_to_expr)
+	grow target_size desired_sig spec result_ty_arg_tys_arg_expss_set plug (ty_to_exprs, ty_to_sigs, sig_to_expr)
 	
 	(* (* (scrutinee_ty : Type.Variant _) *)                                            *)
 	(* List.fold_left (fun (ty_to_exprs, ty_to_sigs) (scrutinee_ty, scrutinees) ->      *)
@@ -575,7 +590,7 @@ let grow_match desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 	(* ) (ty_to_exprs, ty_to_sigs) scrutinees                                           *)
 
 
-let grow_tuple desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
+let grow_tuple target_size desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 	(* set of (result_type, possible arg types) *)
 	(* construct tuples for variant types *)
 	let result_ty_arg_tys_arg_expss_set : (Type.t * (Type.t list) * (Expr.t list) list) BatSet.t =
@@ -584,7 +599,12 @@ let grow_tuple desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 		(* 각 베리언트 마다 만들어내는 타입은 모든 타입 가능 *)
 		BatMap.foldi (fun _ (arg_ty, _) acc ->
 			match arg_ty with 
-			| Type.Tuple ts -> BatSet.add (arg_ty, ts, []) acc
+			| Type.Tuple ts -> 
+				(* let _ = my_prerr_endline (Printf.sprintf "tuple type: %s" (string_of_list Type.show ts)) in *)
+				(* no need to generate units *)
+				if BatList.is_empty ts then acc 
+				else 
+					BatSet.add (arg_ty, ts, []) acc
 			| _ -> acc 	 
 		) spec.vc BatSet.empty
 	in
@@ -595,11 +615,11 @@ let grow_tuple desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 		| Type.Tuple ts -> BatSet.add (input_type, ts, []) result_ty_arg_tys_arg_expss_set
 		| _ -> result_ty_arg_tys_arg_expss_set 
 	in 
-	let plug instances = [Tuple instances] in
-	grow desired_sig spec result_ty_arg_tys_arg_expss_set plug (ty_to_exprs, ty_to_sigs, sig_to_expr) 		 
+	let plug instances = let _ = assert ((List.length instances) > 1) in [Tuple instances] in
+	grow target_size desired_sig spec result_ty_arg_tys_arg_expss_set plug (ty_to_exprs, ty_to_sigs, sig_to_expr) 		 
 
 
-let grow_proj desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
+let grow_proj target_size desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 	let input_values = List.map fst spec.spec in
 	let result_bot = BatList.make (List.length input_values) Bot in
 	let result_top = BatList.make (List.length input_values) WildcardV in 
@@ -610,6 +630,7 @@ let grow_proj desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 				(ty_to_exprs, ty_to_sigs, sig_to_expr)
 			else
   			BatSet.fold (fun expr (ty_to_exprs, ty_to_sigs, sig_to_expr) ->
+					(* no need to add components of form (e1,..ek).i *)
 					if is_tuple_exp expr then (ty_to_exprs, ty_to_sigs, sig_to_expr)
 					else
   				List.fold_left (fun (ty_to_exprs, ty_to_sigs, sig_to_expr) i ->
@@ -631,11 +652,20 @@ let grow_proj desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 							prerr_endline ("new_sig? : " ^ (string_of_bool new_sig));
 							prerr_endline ("invalid? : " ^ (string_of_bool invalid));               *)
       				(* if (new_sig || not_runnable) && (not invalid) && (terminating) then *)
-							if new_sig && ((not (is_recursive e)) || decreasing) && (not invalid) then 
+							
+							(* if new_sig && ((not (is_recursive e)) || decreasing) && (not invalid) then 
       					(add_expr result_ty e ty_to_exprs, 
       					 add_signature result_ty signature ty_to_sigs, 
 								 BatMap.add signature e sig_to_expr)
-  						else (ty_to_exprs, ty_to_sigs, sig_to_expr)
+  						else (ty_to_exprs, ty_to_sigs, sig_to_expr) *)
+							if (Expr.size_of_expr e) > target_size then (ty_to_exprs, ty_to_sigs, sig_to_expr) 
+							else if (is_recursive e) && decreasing then
+								(add_expr result_ty e ty_to_exprs, ty_to_sigs, sig_to_expr) 
+							else if new_sig && (not invalid) then 
+								(add_expr result_ty e ty_to_exprs, 
+      					 add_signature result_ty signature ty_to_sigs, 
+								 BatMap.add signature e sig_to_expr)
+							else (ty_to_exprs, ty_to_sigs, sig_to_expr) 
   				) (ty_to_exprs, ty_to_sigs, sig_to_expr) (BatList.range 0 `To ((List.length arg_types) - 1))
   			) exprs (ty_to_exprs, ty_to_sigs, sig_to_expr)
 		| _ -> (ty_to_exprs, ty_to_sigs, sig_to_expr)
@@ -706,7 +736,7 @@ let enum_bu_search spec =
 				let (ty_to_exprs_list, ty_to_sigs, sig_to_expr) = 
   				List.fold_left (fun (ty_to_exprs_list, ty_to_sigs, sig_to_expr) grow_func ->
   					let (ty_to_exprs', ty_to_sigs, sig_to_expr) = 
-							grow_func desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr)
+							grow_func depth desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr)
 						in
 						(ty_to_exprs' :: ty_to_exprs_list, ty_to_sigs, sig_to_expr)
   				) ([], ty_to_sigs, sig_to_expr) grow_funcs

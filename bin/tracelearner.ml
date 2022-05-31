@@ -330,8 +330,9 @@ and learn_funcs = [learn_ctor; learn_unctor; learn_tuple; learn_proj; learn_app]
 (* library: value (output) -> (closure * type * (value list)) list  (closure, type, arg values) *)
 let compute_library spec ty_to_sigs =
 	(* size of the largest input value *)
+	let inputs : value list = List.map fst spec.spec in 
+	let outputs : value list = List.map snd spec.spec in 
 	let max_height = 
-		let inputs : value list = List.map fst spec.spec in 
 		List.fold_left (fun max_height input ->
 			let height = 
 				match input with 
@@ -363,7 +364,31 @@ let compute_library spec ty_to_sigs =
 		) ty_to_sigs BatSet.empty 
 	in
 	(* collect constants *)
-	let (*(ty_to_exprs, _, _)*)ty_to_exprs = 
+
+	let ty_to_exprs = 
+		let rec get_all_subexpr_in_value v = 
+			match v with 
+			| CtorV (i, v') -> 
+				BatSet.add (exp_of_value v) (get_all_subexpr_in_value v')
+  		| TupleV vs -> 
+				List.fold_left (fun acc v ->
+					BatSet.union (get_all_subexpr_in_value v) acc
+				) BatSet.empty vs
+			| _ -> BatSet.empty 
+		in
+		let exprs = 
+			List.fold_left (fun acc v -> 
+				BatSet.union acc (get_all_subexpr_in_value v)
+			) BatSet.empty (inputs @ outputs) 
+		in
+		BatSet.fold (fun expr ty_to_exprs ->
+			let ty = Typecheck.typecheck_exp spec.ec spec.tc spec.td spec.vc expr in 
+			let exprs = try BatMap.find ty ty_to_exprs with _ -> BatSet.empty in 
+			BatMap.add ty (BatSet.add expr exprs) ty_to_exprs
+		) exprs BatMap.empty 
+	in 
+
+	(* let (*(ty_to_exprs, _, _)*)ty_to_exprs = 
 		BatMap.foldi (fun ty sigs ty_to_exprs -> 
 			BatSet.fold (fun sg ty_to_exprs -> 
 				let exprs = try BatMap.find ty ty_to_exprs with _ -> BatSet.empty in 
@@ -386,7 +411,9 @@ let compute_library spec ty_to_sigs =
 			else fix (depth + 1) (ty_to_exprs', ty_to_sigs', sig_to_expr')
 		in
 		fix 2 (BatMap.add Type._unit (BatSet.singleton unit_) BatMap.empty, BatMap.empty, BatMap.empty) *)
-	in
+	in *)
+
+
 	(* let (ty_to_exprs,_,_) =
 		let (ty_to_exprs, ty_to_sigs, sig_to_expr) =
   		(BatMap.add Type._unit (BatSet.singleton unit_) BatMap.empty,
@@ -467,7 +494,8 @@ let synthesis spec =
 	let ty_to_exprs = BatMap.empty in
 	let ty_to_sigs = BatMap.empty in 
 	let sig_to_expr = BatMap.empty in
-	(* collect exprs that can be used as a variable in a match expression *)
+	(* collect exprs that can be used as a variable in a match expression 
+		 results are without recursive components *)
 	let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
 		let rec fix depth (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
 			let (ty_to_exprs', ty_to_sigs', sig_to_expr') = 
@@ -493,7 +521,13 @@ let synthesis spec =
 		let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
 			get_components_of_depth spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)
 		in
-		if depth < !Options.init_comp_size then
+		(* remove recursive components *)
+		let ty_to_exprs = 
+			let exprs = try BatMap.find desired_ty ty_to_exprs with _ -> BatSet.empty in 
+			let exprs' = BatSet.filter (fun e -> not (is_recursive e)) exprs in 
+			BatMap.add desired_ty exprs' ty_to_exprs
+		in
+		if depth < !Options.init_trace_comp_size then
 			iter (depth+1) (ty_to_exprs, ty_to_sigs, sig_to_expr)
 		else
 		(* construct library *)

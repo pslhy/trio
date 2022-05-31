@@ -165,7 +165,7 @@ let get_components_of_depth ?(grow_funcs=[]) spec (ty_to_exprs, ty_to_sigs, sig_
 				let (ty_to_exprs_list, ty_to_sigs, sig_to_expr) = 
   				List.fold_left (fun (ty_to_exprs_list, ty_to_sigs, sig_to_expr) grow_func ->
   					let (ty_to_exprs', ty_to_sigs, sig_to_expr) = 
-							grow_func desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr)
+							grow_func curr_depth desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr)
 						in
 						(* let _ = 
 							my_prerr_endline "ty_to_exprs' : ";

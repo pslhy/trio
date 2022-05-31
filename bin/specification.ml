@@ -83,7 +83,7 @@ let process_decl_list (decls:declaration list)
 				in  
 				(ec, tc, td', vc')  
   		| ExprDeclaration (id, e) ->
-				let ec' = BatMap.add id e ec in
+				let ec' = BatMap.add id (replace_holes ec e) ec in
 				let ty = Typecheck.typecheck_exp ec' tc td vc e in
 				let tc' = BatMap.add id ty tc in  
 				(ec', tc', td, vc)   

@@ -39,7 +39,7 @@ struct
 
 	let rec show t = 
 		match t with 
-		| Tuple ts -> string_of_list ~first:"" ~last:"" ~sep:"," show ts
+		| Tuple ts -> string_of_list ~first:"[" ~last:"]" ~sep:"," show ts
 		| Ctor (i, t) -> Printf.sprintf "%s(%s)" i (show t)
 		| Var i -> i 
 		| Wildcard -> "_" 
@@ -84,17 +84,17 @@ let rec size_of_expr e =
 	match e with
 	| Var _ -> 1
   | Wildcard -> 1
-  | App (e1, e2) -> (size_of_expr e1) + (size_of_expr e2) + 1
-  | Func (_, e') -> (size_of_expr e') + 2
-  | Ctor (_, e') -> (size_of_expr e') + 2
-  | Unctor (_, e') -> (size_of_expr e') + 2
-  | Eq (_, e1, e2) -> (size_of_expr e1) + (size_of_expr e2) + 2
+  | App (e1, e2) -> (size_of_expr e1) + (size_of_expr e2)
+  | Func (_, e') -> (size_of_expr e')
+  | Ctor (_, e') -> (size_of_expr e') + 1
+  | Unctor (_, e') -> (size_of_expr e')
+  | Eq (_, e1, e2) -> (size_of_expr e1) + (size_of_expr e2) + 1
   | Match (e, patterns) -> 
 		List.fold_left (fun acc (_, e') -> acc + (size_of_expr e') + 1) ((size_of_expr e) + 1) patterns
-  | Fix (_, _, e') -> (size_of_expr e') + 3 
-  | Tuple es -> List.fold_left (fun acc e' -> acc + (size_of_expr e')) 1 es 
-  | Proj (_, e') -> (size_of_expr e') + 2
-
+  | Fix (_, _, e') -> (size_of_expr e')
+  | Tuple es -> List.fold_left (fun acc e' -> acc + (size_of_expr e')) 0 es 
+  | Proj (_, e') -> (size_of_expr e')
+		
 let rec height_of_expr e =
 	match e with
 	| Var _ -> 1
@@ -109,6 +109,21 @@ let rec height_of_expr e =
 	| Fix (_, _, e') -> (height_of_expr e') + 1
 	| Tuple es -> if BatList.is_empty es then 1 else BatList.max (List.map height_of_expr es)
 	| Proj (_, e') -> (height_of_expr e') + 1
+
+let rec match_depth e =
+	match e with
+	| Var _ -> 0
+	| Wildcard -> 0
+	| App (e1, e2) -> (max (match_depth e1) (match_depth e2))
+	| Func (_, e') -> (match_depth e')
+	| Ctor (_, e') -> (match_depth e')
+	| Unctor (_, e') -> (match_depth e')
+	| Eq (_, e1, e2) -> (max (match_depth e1) (match_depth e2))
+	| Match (e', patterns) -> 
+		(List.fold_left (fun acc (_, e') -> max acc (match_depth e')) (match_depth e') patterns) + 1
+	| Fix (_, _, e') -> (match_depth e') + 1
+	| Tuple es -> if BatList.is_empty es then 0 else BatList.max (List.map match_depth es)
+	| Proj (_, e') -> (match_depth e')
 
 let rec count_recursions e = 
 	match e with 
@@ -281,7 +296,7 @@ let rec show ?(indent=0) e =
 		| Fix (i, t, e') -> 
 			Printf.sprintf "let rec (%s : %s) = \n%s" i (Type.show t) (show ~indent:(indent + 1) e')
 		| Tuple es -> 
-			string_of_list ~first:"(" ~last:")" ~sep:", " (fun e -> show ~indent:0 e) es 
+			string_of_list ~first:"[" ~last:"]" ~sep:", " (fun e -> show ~indent:0 e) es 
 		| Proj (i, e') -> 
 			Printf.sprintf "(%s).%d" (show e') i   	   
 	in
@@ -508,7 +523,7 @@ let rec get_recursive_calls e =
   | Unctor (_, e) -> get_recursive_calls e
   | Eq (_, e1, e2) -> BatSet.union (get_recursive_calls e1) (get_recursive_calls e2)
   | Match (e, patterns) -> 
-		List.fold_left (fun acc (_, e) -> BatSet.union acc (get_recursive_calls e)) BatSet.empty patterns 
+		List.fold_left (fun acc (_, e) -> BatSet.union acc (get_recursive_calls e)) (get_recursive_calls e) patterns 
   | Fix (_, _, e) -> (get_recursive_calls e)
   | Tuple es -> List.fold_left (fun acc e -> BatSet.union acc (get_recursive_calls e)) BatSet.empty es
   | Proj (_, e) -> (get_recursive_calls e)
@@ -547,7 +562,7 @@ let using_allowed_unconstructor expr available_uncons =
 
 let rec get_args e =
 	match e with 
- 	| App (Var _, e2) -> BatSet.add e2 (get_args e2)
+ 	| App (Var _, e2) -> (get_args e2)
 	| App (e1, e2) -> BatSet.union (get_args e1) (get_args e2)
 	| Func (_, e) -> get_args e
   | Ctor (_, e) -> get_args e
@@ -558,7 +573,7 @@ let rec get_args e =
   | Fix (_, _, e) -> (get_args e)
   | Tuple es -> List.fold_left (fun acc e -> BatSet.union acc (get_args e)) BatSet.empty es
   | Proj (_, e) -> (get_args e)
-	| _ -> BatSet.empty   
+	| _ -> BatSet.singleton e
 		
 (* let get_args e =                                                       *)
 (* 	let rec get_args_internal e =                                        *)
@@ -771,5 +786,7 @@ let safe_evaluate_with_context eval_context (e : t) : value =
 	try
 		let e = replace_holes eval_context e in
   	evaluate e 
-	with _ -> Bot
+	with exn -> 
+		(* my_prerr_endline ("exception in safe_evaluate_with_context: " ^ (Printexc.to_string exn)); *)
+		Bot
 	
