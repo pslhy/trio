@@ -162,20 +162,20 @@ let rec cost_of_expr e =
   match e with
   | Var _ -> 0
   | Wildcard -> 100
-  | App (e1, e2) -> if (count_recursions e) < 1 then (cost_of_expr e1) + (cost_of_expr e2) + 1
-										else (cost_of_expr e1) + (cost_of_expr e2) - 300
-  | Func (p, e') -> (cost_of_expr e') + 1
-  | Ctor (i, e') -> (cost_of_expr e') + 2
-  | Unctor (i, e') -> (cost_of_expr e') + 2
+  | App (e1, e2) -> if (count_recursions e) < 1 then (cost_of_expr e1) + (cost_of_expr e2) + 2
+										else (cost_of_expr e1) + (cost_of_expr e2) + 1
+  | Func (p, e') -> (cost_of_expr e')
+  | Ctor (i, e') -> (cost_of_expr e') + 1
+  | Unctor (i, e') -> (cost_of_expr e')
   | Eq (b, e1, e2) -> (cost_of_expr e1) + (cost_of_expr e2) + 1
   | Match (e', patterns) ->
-    List.fold_left (fun acc (pat, e') -> acc + (cost_of_expr e') + 1) 0 patterns
-  | Fix (_, _, e') -> (cost_of_expr e') - 1
+    List.fold_left (fun acc (pat, e') -> acc + (cost_of_expr e') + 1) ((cost_of_expr e') + 1000) patterns
+  | Fix (_, _, e') -> (cost_of_expr e')
   | Tuple es -> 
-		if BatList.is_empty es then 100
+		if BatList.is_empty es then 10
 		else 
 			List.fold_left (fun acc e' -> acc + (cost_of_expr e')) 1 es
-  | Proj (_, e') -> (cost_of_expr e') + 1
+  | Proj (_, e') -> (cost_of_expr e')
 			 
 let ekind_of_expr expr = 
 	match expr with 

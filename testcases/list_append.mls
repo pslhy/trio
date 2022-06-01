@@ -9,7 +9,7 @@ type list =
 synth list -> list -> list satisfying
 
 [Nil,Nil] -> Nil,
-[Nil,Cons(0,Nil)] -> Cons(0,Nil),
+(*[Nil,Cons(0,Nil)] -> Cons(0,Nil),*)
 [Cons(1,Cons(0,Nil)),Nil] -> Cons(1,Cons(0,Nil)),
 [Cons(0,Nil),Cons(0,Nil)] -> Cons(0,Cons(0,Nil)),
 [Cons(1,Cons(0,Nil)),Cons(0,Nil)] -> Cons(1,Cons(0,Cons(0,Nil))),

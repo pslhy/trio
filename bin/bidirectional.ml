@@ -44,15 +44,15 @@ struct
 		let e2_score = cost_of_expr e2 in 
 
 		
-		(* if e1_match_depth <> e2_match_depth then e1_match_depth - e2_match_depth
-		else  *)
+		if e1_match_depth <> e2_match_depth then e1_match_depth - e2_match_depth
+		else 
 			if n_subgoals1 <> n_subgoals2 then n_subgoals1 - n_subgoals2 
 			else 
-				if e1_size <> e1_size then e1_size - e2_size 
-				else 
 				if e1_score <> e2_score then e1_score - e2_score
 				(* if e1_score <> e2_score then ceil (e1_score -. e2_score) |> int_of_float *)
 				else 
+					if e1_size <> e1_size then e1_size - e2_size 
+					else 
 					if e1_height <> e2_height then e1_height - e2_height
 					else  
 						Stdlib.compare e1 e2
@@ -182,18 +182,18 @@ and learn candidate addr available_uncons pts spec (desired_sig, desired_type) (
 		if not (BatSet.is_empty sigs) then 
 			(* if the candidate contains (or may contain in the future) recursive calls, must use all possible components 
 				 any wildcard (hole) can be filled with a recursive call. so all candidates are targets *)
-				
-				(* BatSet.fold (fun sg acc -> 
+			if !Options.find_all then 	
+				BatSet.fold (fun sg acc -> 
 					let expr = try BatMap.find sg sig_to_expr with _ -> assert false in
 					if (using_allowed_unconstructor expr available_uncons) then 
 						let plugged = plug candidate (addr, expr) in 
 						let _ = my_prerr_endline (Printf.sprintf "direct: plugging %s into %s and obtain %s" (Expr.show expr) (Expr.show candidate) (Expr.show plugged)) in 
 						BatSet.add (plugged, []) acc
 					else acc
-				) sigs BatSet.empty  *)
+				) sigs BatSet.empty 
 			
 				(* otherwise, choose the smallest component *)
-			(* else *)
+			else
 				let expr = 
 					let init_expr = BatMap.find (BatSet.choose sigs) sig_to_expr in 
 					(* init_expr *)
@@ -219,7 +219,7 @@ and learn candidate addr available_uncons pts spec (desired_sig, desired_type) (
 			let inputs = List.map fst spec.spec in
 			BatSet.fold (fun rec_expr acc ->
 				let plugged = plug candidate (addr, rec_expr) in 
-				let _ = my_prerr_endline (Printf.sprintf "plugged : %s" (Expr.show plugged)) in
+				(* let _ = my_prerr_endline (Printf.sprintf "plugged : %s" (Expr.show plugged)) in *)
 				(* let violate_angelic_assumption = 
 					match rec_expr with 
 					| App (Var i, arg_exp) when BatString.equal i target_func -> 
@@ -1154,7 +1154,7 @@ let update_heap available_depth candidate_info heap spec (desired_sig, desired_t
 							my_prerr_endline (Printf.sprintf "through concolic eval, checking feasibility of %s" (Expr.show next_candidate)) 
 						in
 						let feasible =
-							let filter_fun = if !Options.trace_complete then BatList.for_all else BatList.exists in 
+							let filter_fun = if true (*!Options.trace_complete*) then BatList.for_all else BatList.exists in 
 							filter_fun
 							 (fun pt -> 
 								(* let _ = my_prerr_endline (Printf.sprintf "input [%d]" pt) in *)
@@ -1267,10 +1267,12 @@ let synthesis spec =
 	let rec iter depth (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 		(* clean up caches *)
 		let _ = init () in
-		(* let _ = 
+
+		let _ = 
 			if depth > !Options.max_height then 
 				failwith (Printf.sprintf "No solution within depth of %d." !Options.max_height) 
-		in *)
+		in
+
 		(* let rec fix (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
 			let (ty_to_exprs', ty_to_sigs', sig_to_expr') = 
 				get_components_of_depth spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)

@@ -95,8 +95,9 @@ let rec is_match_with_basecase e =
 			let rec_calls_in_branches = 
 				List.map (fun (p, e) -> get_recursive_calls e) patterns 
 			in
-			(List.exists BatSet.is_empty rec_calls_in_branches) && 
-			(List.for_all (fun (p, e) -> is_match_with_basecase e) patterns)
+			(List.exists BatSet.is_empty rec_calls_in_branches) 
+			(* && 
+			(List.for_all (fun (p, e) -> is_match_with_basecase e) patterns) *)
 	| _ -> true 		 
 			 
 						

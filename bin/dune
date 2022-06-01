@@ -5,7 +5,7 @@
  (name main)
  (modes exe)
  (preprocess (pps ppx_deriving.std ppx_compare))
- (libraries batteries yojson))
+ (libraries batteries))
 (env
  (dev
   (flags (:standard -warn-error -A))))
