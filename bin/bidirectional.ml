@@ -55,7 +55,7 @@ struct
 					else 
 					if e1_height <> e2_height then e1_height - e2_height
 					else  
-						Stdlib.compare e1 e2
+						Stdlib.compare t1 t2 
 
 end
 
@@ -233,9 +233,9 @@ and learn candidate addr available_uncons pts spec (desired_sig, desired_type) (
 				in
 				if violate_angelic_assumption then result 
 				else *)
-					let _ = my_prerr_endline (Printf.sprintf "direct: plugging %s into %s and obtain %s" (Expr.show rec_expr) (Expr.show candidate) (Expr.show plugged)) in 
+					let _ = my_prerr_endline (Printf.sprintf "direct: plugging recursive %s into %s and obtain %s" (Expr.show rec_expr) (Expr.show candidate) (Expr.show plugged)) in 
 					BatSet.add (plugged, []) acc
-			) rec_exprs BatSet.empty
+			) rec_exprs result
 		in
 		(* 다른 rule 들 사용한 결과 추가 *)
 		let result = 
@@ -496,10 +496,11 @@ let _ =
 in
 (* match is allowed only in the top-level or a branch *)
 let is_match_allowed = 
-	match parent_expr with 
+	(List.length pts) > 1 && 
+	(match parent_expr with 
 	| Match _ -> true
 	| Wildcard -> true
-	| _ -> false
+	| _ -> false)
 in
 if not is_match_allowed then BatSet.empty
 else
