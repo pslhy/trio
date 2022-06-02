@@ -33,8 +33,6 @@ let main () =
 			in 
 			let e = 
 				try
-					let trace_vsas = Tracelearner.synthesis spec in 
-					let _ = Bidirectional.trace_vsas := trace_vsas in 
 					Bidirectional.synthesis spec
 				with Generator.SolutionFound sol ->
 				(* a solution is found while generating components *) 

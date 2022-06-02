@@ -1254,39 +1254,52 @@ let synthesis spec =
 	let ty_to_exprs = BatMap.empty in
 	let ty_to_sigs = BatMap.empty in 
 	let sig_to_expr = BatMap.empty in
-	(* collect exprs for "variables" *)
-	(* let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
+	(* collect exprs that can be used as a variable in a match expression 
+			results are without recursive components *)
+	let (ty_to_exprs', ty_to_sigs', sig_to_expr') = 
 		let rec fix depth (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
 			let (ty_to_exprs', ty_to_sigs', sig_to_expr') = 
-				get_components_of_depth ~grow_funcs:[grow_unctor; grow_proj] spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)
+				get_components_of_depth ~grow_funcs:[grow_unctor; grow_proj] spec (BatMap.empty, BatMap.empty, BatMap.empty) (depth, depth + 1)
 			in
-			if (BatMap.compare BatSet.compare ty_to_exprs' ty_to_exprs) = 0 || depth >= !Options.max_match_depth then (ty_to_exprs, ty_to_sigs, sig_to_expr)
+			if (BatMap.compare BatSet.compare ty_to_exprs' ty_to_exprs) = 0 then 
+				(ty_to_exprs, ty_to_sigs, sig_to_expr)
 			else fix (depth + 1) (ty_to_exprs', ty_to_sigs', sig_to_expr')
 		in
 		fix 1 (ty_to_exprs, ty_to_sigs, sig_to_expr)
-	in *)
+	in
 	let rec iter depth (ty_to_exprs, ty_to_sigs, sig_to_expr) =
-		(* clean up caches *)
-		let _ = init () in
-
+		let vsas =
+			let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
+				(merge_map BatSet.empty BatSet.union ty_to_exprs' ty_to_exprs, 
+				 merge_map BatSet.empty BatSet.union ty_to_sigs' ty_to_sigs, 
+				 merge_map Expr.Wildcard (fun a b -> b) sig_to_expr' sig_to_expr)
+			in
+			(* remove recursive components *)
+			let ty_to_exprs = 
+				let exprs = try BatMap.find desired_ty ty_to_exprs with _ -> BatSet.empty in 
+				let exprs' = BatSet.filter (fun e -> not (is_recursive e)) exprs in 
+				BatMap.add desired_ty exprs' ty_to_exprs
+			in
+			(* clean up caches *)
+			let _ = Tracelearner.init () in
+			BatList.mapi (fun i _ ->
+				let pts = [i] in 
+				Tracelearner.learn !Options.max_height pts spec (desired_sig, desired_ty) 
+					(ty_to_exprs, ty_to_sigs, sig_to_expr)
+			) input_values  
+		in
+		let _ = 
+			Tracelearner.library := Tracelearner.compute_library spec ty_to_sigs
+		in	
+		let _ = trace_vsas := vsas in  
+		(* let _ = trace_vsas := Tracelearner.synthesis spec  in   *)
+		(* let _ = incr Options.init_trace_comp_size in  *)
 		let _ = 
 			if depth > !Options.max_height then 
 				failwith (Printf.sprintf "No solution within depth of %d." !Options.max_height) 
 		in
-
-		(* let rec fix (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
-			let (ty_to_exprs', ty_to_sigs', sig_to_expr') = 
-				get_components_of_depth spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)
-			in
-			if (BatMap.compare BatSet.compare ty_to_exprs' ty_to_exprs) = 0 then 
-				(ty_to_exprs, ty_to_sigs, sig_to_expr)
-			else fix (ty_to_exprs', ty_to_sigs', sig_to_expr')
-		in *)
 		let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
-			(* fix (ty_to_exprs, ty_to_sigs, sig_to_expr) *)
 			get_components_of_depth spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)
-			(* no grow_app *)
-			(* get_components_of_depth ~grow_funcs:[grow_tuple; grow_proj; grow_ctor; grow_unctor; grow_eq] spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1) *)
 		in
 		if depth < !Options.init_comp_size then
 			iter (depth+1) (ty_to_exprs, ty_to_sigs, sig_to_expr)
@@ -1305,7 +1318,8 @@ let synthesis spec =
 		with NoSolInVSA -> (* no solution found *) 
 			iter (depth + 1) (ty_to_exprs, ty_to_sigs, sig_to_expr) 
 	in
-	try 
+	try
+		(* let _ = trace_vsas := Tracelearner.synthesis spec  in   *)
 		iter 1 (ty_to_exprs, ty_to_sigs, sig_to_expr)
 	with Generator.SolutionFound sol ->
 	(* a solution is found while generating components *) 
