@@ -1,6 +1,7 @@
 let debug = ref false
 let max_size = ref 32
 let max_height = ref 6
+let max_deduc = ref 6
 let init_trace_comp_size = ref 2
 let init_comp_size = ref 5
 let find_all = ref false 
@@ -21,6 +22,7 @@ let options =
 	 ("-concolic_threshold", Arg.Int (fun x -> concolic_eval_threshold := x), "set concolic_eval_threshold");
 	 ("-max_size", Arg.Int (fun x -> max_size := x), "set the maximum size of candidates");
 	 ("-max_height", Arg.Int (fun x -> max_height := x), "set the maximum height of candidates");
+	 ("-max_deduc", Arg.Int (fun x -> max_deduc := x), "set the maximum number of steps of deduction");
 	 ("-init_comp_size", Arg.Int (fun x -> init_comp_size := x), "set the initial size of components");
 	 ("-init_trace_comp_size", Arg.Int (fun x -> init_trace_comp_size := x), "set the initial size of trace components")	 
   ]

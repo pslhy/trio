@@ -199,7 +199,8 @@ and learn candidate addr available_uncons pts spec (desired_sig, desired_type) (
 					(* init_expr *)
 					BatSet.fold (fun sg min_expr -> 
 						let expr = BatMap.find sg sig_to_expr in 
-						if (Expr.size_of_expr expr) < (Expr.size_of_expr min_expr) then expr 
+						(* if (Expr.size_of_expr expr) < (Expr.size_of_expr min_expr) then expr  *)
+						if (Expr.cost_of_expr expr) < (Expr.cost_of_expr min_expr) then expr 	
 						else min_expr
 					) sigs init_expr
 				in
