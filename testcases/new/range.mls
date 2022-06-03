@@ -1,14 +1,10 @@
-
-include "nat.decls"
-include "compare.decls"
-
 type nat =
   | O
   | S of nat
 
-type bool =
-  | True
-  | False
+type list =
+  | Nil
+  | Cons of nat * list
 
 type cmp =
   | LT
@@ -27,10 +23,6 @@ let compare =
                 | O -> GT
                 | S x2 -> compare x1 x2)
 ;;
-
-type list =
-  | Nil
-  | Cons of nat * list
 
 synth nat -> nat -> list satisfying
 

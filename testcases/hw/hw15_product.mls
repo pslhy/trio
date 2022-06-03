@@ -1,4 +1,10 @@
-include "nat.decls"
+type nat =
+  | O
+  | S of nat
+
+type bool =
+  | True
+  | False
 
 synth nat -> nat -> nat satisfying
 

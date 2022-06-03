@@ -24,6 +24,18 @@ let compare =
                 | S x2 -> compare x1 x2)
 ;;
 
+let insert =
+  fix (insert : list -> nat -> list) =
+    fun (l1 : list) ->
+      fun (n : nat) ->
+        match l1 with
+        | Nil -> Cons (n, Nil)
+        | Cons (h,t) -> (match compare n h with
+                | LT -> Cons (n, l1)
+                | EQ -> l1
+                | GT -> Cons (h, insert t n))
+;;
+
 synth list -> list -> list satisfying
 
 [Nil,Nil] -> Nil,

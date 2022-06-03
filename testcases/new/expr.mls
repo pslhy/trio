@@ -1,5 +1,3 @@
-include "nat.decls"
-
 type nat = 
 | O 
 | S of nat 
@@ -31,6 +29,6 @@ let mul =
 synth exp -> nat satisfying 
 
 [INT(1)] -> 1, 
-[ADD(INT(1), INT(2))] -> 3, 
+[ADD(INT(3), INT(4))] -> 7, 
 [MUL(INT(3), INT(3))] -> 9, 
 [MUL(INT(2), INT(3))] -> 6, 
