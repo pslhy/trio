@@ -1,0 +1,22 @@
+include "nat.decls"
+
+type nat =
+  | O
+  | S of nat
+
+type bool =
+  | True
+  | False
+
+let neg = 
+	fun ( x : bool ) ->
+		match x with
+		| True -> False
+		| False -> True
+;;
+
+synth nat -> bool satisfying
+
+[0] -> True,
+[2] -> True,
+[3] -> False

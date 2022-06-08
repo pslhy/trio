@@ -1,0 +1,59 @@
+type bool =
+| True
+| False
+
+type formula =
+| BOOL of bool
+| NOT of formula
+| ANDALSO of formula * formula
+| ORELSE of formula * formula
+| IMPLY of formula * formula
+
+let bnot =
+ fix (bnot : bool -> bool) =
+   fun (x: bool) ->
+    match x with
+    | False ->
+        True
+    | True ->
+        False
+;;  
+
+let band =
+ fix (band : bool -> bool -> bool) =
+  fun (x: bool) ->
+   fun (y: bool) ->
+    match x with
+     | False ->
+        x
+     | True ->
+        y
+;;
+
+let bor =
+ fix (bor : bool -> bool -> bool) =
+  fun (x: bool) ->
+   fun (y: bool) ->
+    match x with
+     | False ->
+        y
+     | True ->
+        x
+;;
+
+synth formula -> bool satisfying
+
+[BOOL(True)] -> True,
+[BOOL(False)] -> False,
+[NOT(BOOL(True))] -> False,
+[NOT(BOOL(False))] -> True,
+[ANDALSO(BOOL(True), BOOL(False))] -> False,
+[ANDALSO(BOOL(True), BOOL(True))] -> True,
+[ANDALSO(BOOL(False), BOOL(True))] -> False,
+[ORELSE(BOOL(True), BOOL(False))] -> True,
+[ORELSE(BOOL(False), BOOL(False))] -> False,
+[ORELSE(BOOL(False), BOOL(True))] -> True,
+[IMPLY(BOOL(True), BOOL(False))] -> False,
+[IMPLY(BOOL(False), BOOL(False))] -> True,
+[IMPLY(BOOL(False), BOOL(True))] -> True,
+[IMPLY(BOOL(True), BOOL(True))] -> True
