@@ -22,9 +22,9 @@ let compare =
         | O -> (match x2 with
                 | O -> EQ
                 | S _ -> LT)
-        | S x1 -> (match x2 with
+        | S x1p -> (match x2 with
                 | O -> GT
-                | S x2 -> compare x1 x2)
+                | S x2p -> compare x1p x2p)
 ;;
 
 let add =
@@ -60,6 +60,12 @@ let div =
   fix (div : nat -> nat -> nat) =
     fun (n1 : nat) ->
       fun (n2 : nat) ->
+      match n2 with
+      | O -> O
+      | S n2p ->
+      match n1 with
+      | O -> O
+      | S n1p ->
         match (compare n1 n2) with
           | LT -> O
           | EQ -> S(O)
