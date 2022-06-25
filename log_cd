@@ -1,0 +1,69 @@
+testcases/candidate
+product.mls
+prog : testcases/candidate/product.mls
+let rec (f : ((nat, nat) -> nat)) = 
+  fun (x:(nat, nat)) -> 
+    match (x).1 with
+    O(_) -> 
+      (x).1
+    S(_) -> 
+      ((add (f [Un_S((x).1), (x).0])) (x).0)
+    
+time(s): 1.40 
+mem(Kb): 31436
+
+
+fact.mls
+prog : testcases/candidate/fact.mls
+Fatal error: exception Failure("nonfunc applied")
+Command exited with non-zero status 2
+time(s): 0.00 
+mem(Kb): 2612
+
+
+nat_mod.mls
+prog : testcases/candidate/nat_mod.mls
+Fatal error: exception Failure("typecheck: ctor")
+Command exited with non-zero status 2
+time(s): 0.01 
+mem(Kb): 2592
+
+
+list_last2.mls
+prog : testcases/candidate/list_last2.mls
+let rec (f : (list -> natopt)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      None([])
+    Cons(_) -> 
+      match (Un_Cons(x)).1 with
+      Nil(_) -> 
+        None([])
+      Cons(_) -> 
+        match (Un_Cons((Un_Cons(x)).1)).1 with
+        Nil(_) -> 
+          Some([(Un_Cons(x)).0, (Un_Cons((Un_Cons(x)).1)).0])
+        Cons(_) -> 
+          (f (Un_Cons(x)).1)
+        
+      
+    
+time(s): 0.02 
+mem(Kb): 6420
+
+
+list_make
+prog : testcases/candidate/list_make
+let rec (f : (nat -> list)) = 
+  fun (x:nat) -> 
+    match x with
+    O(_) -> 
+      Nil([])
+    S(_) -> 
+      Cons([O([]), (f Un_S(x))])
+    
+time(s): 0.01 
+mem(Kb): 5284
+
+

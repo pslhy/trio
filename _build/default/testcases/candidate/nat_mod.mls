@@ -1,0 +1,34 @@
+type nat =
+  | O
+  | S of nat
+
+let compare =
+  fix (compare : nat -> nat -> cmp) =
+    fun (x1 : nat) ->
+      fun (x2 : nat) ->
+        match x1 with
+        | O -> (match x2 with
+                | O -> EQ
+                | S _ -> LT)
+        | S x1p -> (match x2 with
+                | O -> GT
+                | S x2p -> compare x1p x2p)
+;;
+
+let sub =
+  fix (sub : nat -> nat -> nat) =
+    fun (n1 : nat) ->
+      fun (n2 : nat) ->
+        match n1 with
+        | O -> O
+        | S n1p -> match n2 with
+                    | O -> n1
+                    | S n2p -> (sub n1p n2p)
+;;
+
+synth nat -> nat -> nat satisfying
+
+[5,3] -> 2,
+[4,6] -> 4,
+[10,5] -> 0,
+[7,2] -> 1,

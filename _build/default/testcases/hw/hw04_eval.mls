@@ -1,0 +1,24 @@
+type bool =
+  | True
+  | False
+
+type formula =
+  | T
+  | F
+  | Not of formula
+  | And of formula * formula
+  | Or of formula * formula
+
+synth formula -> bool satisfying
+
+[T] -> True,
+[F] -> False,
+[Not(T)] -> False,
+[And(F,F)] -> False,
+[And(F,T)] -> False,
+[And(T,F)] -> False,
+[And(T,T)] -> True,
+[Or(F,F)] -> False,
+[Or(F,T)] -> True,
+[Or(T,F)] -> True,
+[Or(T,T)] -> True,

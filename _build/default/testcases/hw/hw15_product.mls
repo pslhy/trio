@@ -1,0 +1,16 @@
+type nat =
+  | O
+  | S of nat
+
+type bool =
+  | True
+  | False
+
+synth nat -> nat -> nat satisfying
+
+[0,0] -> 0,
+[1,0] -> 0,
+[1,2] -> 2,
+[3,3] -> 9,
+[3,2] -> 6,
+[2,2] -> 4,

@@ -1,0 +1,11 @@
+(menhir (modules parser))
+(ocamllex lexer)
+(executable
+ (public_name trace_synth)
+ (name main)
+ (modes exe)
+ (preprocess (pps ppx_deriving.std ppx_compare))
+ (libraries batteries))
+(env
+ (dev
+  (flags (:standard -warn-error -A))))
