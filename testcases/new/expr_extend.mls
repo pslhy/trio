@@ -63,13 +63,13 @@ let div =
       match n2 with
       | O -> O
       | S n2p ->
-      match n1 with
-      | O -> O
-      | S n1p ->
-        match (compare n1 n2) with
-          | LT -> O
-          | EQ -> S(O)
-          | GT -> S (div (sub n1 n2) n2)
+        match n1 with
+        | O -> O
+        | S n1p ->
+          match (compare n1 n2) with
+            | LT -> O
+            | EQ -> S(O)
+            | GT -> S (div (sub n1 n2) n2)
 ;;
 
 synth exp -> nat satisfying 
