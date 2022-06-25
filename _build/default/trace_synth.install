@@ -1,8 +1,0 @@
-lib: [
-  "_build/install/default/lib/trace_synth/META"
-  "_build/install/default/lib/trace_synth/dune-package"
-  "_build/install/default/lib/trace_synth/opam"
-]
-bin: [
-  "_build/install/default/bin/trace_synth"
-]
