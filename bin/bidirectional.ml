@@ -734,7 +734,7 @@ and learn_app candidate addr available_uncons pts spec (desired_sig, desired_typ
 												else false 
 											) pts 
 										in
-										if okay then 
+										if !Options.no_invmap || okay then 
 											arg_expr :: arg_exprs 
 										else arg_exprs 
 									) arg_sigs []
@@ -1289,9 +1289,18 @@ let synthesis spec =
 					(ty_to_exprs, ty_to_sigs, sig_to_expr)
 			) input_values  
 		in
+		my_prerr_endline (Printf.sprintf "Trace expressions are learned");
+		if !Options.print_traces then 
+			BatList.iteri (fun i vsa ->
+				let exprs = set_of_vsa vsa in
+				BatSet.iter (fun e ->
+					prerr_endline (Printf.sprintf "%s [%d]" (Expr.show (normalize e)) i)
+				) exprs
+			) vsas;
 		let _ = 
 			Tracelearner.library := Tracelearner.compute_library spec ty_to_sigs
 		in	
+		my_prerr_endline (Printf.sprintf "Inverse maps obtained");
 		let _ = trace_vsas := vsas in  
 		(* let _ = trace_vsas := Tracelearner.synthesis spec  in   *)
 		(* let _ = incr Options.init_trace_comp_size in  *)
