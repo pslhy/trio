@@ -514,7 +514,14 @@ let branching_infos =
 		| Type.Named i ->
 			let resolved_ty = try BatMap.find i spec.td with _ -> prerr_endline i; assert false in 
 			if (Type.is_variant_type resolved_ty) then
-				let n_variants = Type.destruct_variant resolved_ty |> List.length in
+				let variants = Type.destruct_variant resolved_ty in
+				let n_variants = variants |> List.length in
+				let init_pat2pts = 
+					List.fold_left (fun m (i, _) -> 
+						let pat = Pattern.Ctor (i, Pattern.Wildcard) in
+						BatMap.add pat [] m 
+					) BatMap.empty variants
+				in 
 				BatSet.fold (fun sg branching_infos ->
 					let scrutinee = try BatMap.find sg sig_to_expr with _ -> assert false in
 					(* invalid scrutinee that uses unallowed unconstructors or of recursive call
@@ -536,7 +543,7 @@ let branching_infos =
 										let pts = try BatMap.find pat m with _ -> [] in  
 										BatMap.add pat (pts @ [pt]) m 
 									| _ -> m  
-								) BatMap.empty (List.combine sg_pts pts) 
+								) init_pat2pts (List.combine sg_pts pts) 
 							in
 							BatMap.foldi (fun pat pts branches ->
 								branches @ [(pat, pts)]   
@@ -547,13 +554,29 @@ let branching_infos =
 							BatList.fast_sort (fun (pat1, _) (pat2, _) ->  Pattern.my_compare pat1 pat2 spec.vc) branches
 						in 
 						(* scrutinee should cover all constructors, i.e., branches *)
-						if (List.length branches) = n_variants then
+						(* if (List.length branches) = n_variants then *)
 							BatSet.add (scrutinee, branches) branching_infos	  
-						else branching_infos
+						(* else branching_infos *)
 				) sigs branching_infos 
 			else branching_infos
 		| _ -> branching_infos  
 	) ty_to_sigs BatSet.empty  
+in 
+let branching_infos = 
+	let branching_infos' = 
+		BatSet.filter (fun (_, branches) -> 
+			List.for_all (fun (_, pts) -> not (BatList.is_empty pts)) branches 
+		) branching_infos 
+	in 
+	if BatSet.is_empty branching_infos' && parent_expr = Wildcard then 
+		BatSet.filter (fun (_, branches) -> 
+			List.exists (fun (_, pts) -> not (BatList.is_empty pts)) branches 
+		) branching_infos 
+		|> set_map (fun (scrutinee, branches) -> 
+				let branches' = List.map (fun (pat, pts) -> (pat, if BatList.is_empty pts then [0] else pts)) branches in 
+				(scrutinee, branches')
+			)
+	else branching_infos'
 in 
 (* 2. 각 브랜치 별로 available_uncons 추가해서 learn *)		
 (* branches: (Pattern.t * int list) list *)
