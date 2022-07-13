@@ -1,0 +1,19 @@
+type bool =                                   
+  | False                                     
+  | True                                      
+
+synth bool -> bool -> bool satisfying
+
+[True,True] -> False,
+[False,True] -> True,
+
+equiv
+
+fix (f : bool -> bool -> bool) =
+  fun (b1:bool) ->
+    fun (b2:bool) ->
+    match b1 with
+      | False _ -> b2
+      | True _ -> (match b2 with
+                     | False _ -> True
+                     | True _ -> False)

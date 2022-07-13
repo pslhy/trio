@@ -1,0 +1,20 @@
+type nat =
+  | O
+  | S of nat
+
+type list =
+  | Nil
+  | Cons of nat * list
+
+synth nat -> list satisfying
+
+[0] -> Nil,
+[3] -> Cons(0,Cons(0,Cons(0,Nil))),
+[2] -> Cons(0,Cons(0,Nil)),
+
+equiv
+
+fix (f : nat -> list) =
+  fun (x:nat) -> match x with
+                   | O -> Nil
+                   | S x1p -> Cons (0, f x1p)

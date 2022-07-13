@@ -1,0 +1,19 @@
+type nat =
+  | O
+  | S of nat
+
+type bool =
+  | True
+  | False
+
+synth nat -> nat satisfying
+
+[0] -> 0,
+[2] -> 1
+
+equiv
+
+fun (x:nat) ->
+  match x with
+    | O -> O
+    | S np -> np

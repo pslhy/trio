@@ -2,6 +2,11 @@ type nat =
   | O
   | S of nat
 
+type cmp =
+  | LT
+  | EQ
+  | GT
+
 let compare =
   fix (compare : nat -> nat -> cmp) =
     fun (x1 : nat) ->
@@ -28,7 +33,16 @@ let sub =
 
 synth nat -> nat -> nat satisfying
 
-[5,3] -> 2,
-[4,6] -> 4,
-[10,5] -> 0,
-[7,2] -> 1,
+[0,0] -> 0,
+[1,0] -> 1,
+[2,1] -> 0,
+
+equiv
+
+fix (f : nat -> nat -> nat) =
+    fun (n1 : nat) ->
+      fun (n2 : nat) ->
+        match compare n1 n2 with
+        | LT -> n1
+        | EQ -> O
+        | GT -> (f (sub n1 n2) n2)

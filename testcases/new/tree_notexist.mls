@@ -28,13 +28,28 @@ let compare =
                 | S x2 -> compare x1 x2)
 ;;
 
+let band =
+ fix (band : bool -> bool -> bool) =
+  fun (x: bool) ->
+   fun (y: bool) ->
+    match x with
+     | False ->
+        x
+     | True ->
+        y
+;;
+
 synth nat -> tree -> bool satisfying
 
 [1, Leaf] -> True,
 [0, Leaf] -> True,
 [0, Node (0, Leaf, Leaf)] -> False,
 [1, Node (0, Leaf, Leaf)] -> True,
-[2, Node (0, Node (1, Leaf, Leaf), Leaf)] -> True,
-[2, Node (0, Leaf, Node (1, Leaf, Leaf))] -> True,
+[0, Node (1, Leaf, Leaf)] -> True,
+[0, Node (1, Node (0, Leaf, Leaf), Leaf)] -> False,
+[1, Node (0, Node (1, Leaf, Leaf), Leaf)] -> False,
+[0, Node (1, Leaf, Node (0, Leaf, Leaf))] -> False,
+[1, Node (0, Leaf, Node (0, Leaf, Leaf))] -> True,
+[1, Node (0, Leaf, Node (1, Leaf, Leaf))] -> False,
 [2, Node (0, Node (1, Leaf, Leaf), Node (2, Leaf, Leaf))] -> False,
 [3, Node (0, Node (1, Node (2, Leaf, Leaf), Leaf), Leaf)] -> True,

@@ -43,11 +43,11 @@ let height =
     fun (x : tree) ->
       match x with
       | Leaf _ -> O
-      | Node _ -> match (Un_Node x.1) with
-                | Leaf _ -> S((height (Un_Node x.2)))
-                | Node _ -> match (Un_Node x.2) with
-                             | Leaf _ -> S((height (Un_Node x.1)))
-                             | Node _ -> S(max (height (Un_Node x.1)) (height (Un_Node x.2)))
+      | Node y -> match y.1 with
+                | Leaf _ -> S((height (y.2)))
+                | Node z -> match y.2 with
+                             | Leaf _ -> S((height (y.1)))
+                             | Node w -> S(max (height (y.1)) (height (y.2)))
 ;;
 
 synth tree -> bool satisfying

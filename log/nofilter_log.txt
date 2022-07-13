@@ -1,0 +1,993 @@
+synthesizer :nofilter
+prog : testcases/basic/bool_always_false.mls
+
+let rec (f : (bool -> bool)) = 
+  fun (x:bool) -> 
+    False([])
+Time(s): 0.00 
+Mem(Kb): 2732
+
+
+synthesizer :nofilter
+prog : testcases/basic/bool_always_true.mls
+
+let rec (f : (bool -> bool)) = 
+  fun (x:bool) -> 
+    True([])
+Time(s): 0.00 
+Mem(Kb): 2728
+
+
+synthesizer :nofilter
+prog : testcases/basic/bool_band.mls
+
+let rec (f : ((bool, bool) -> bool)) = 
+  fun (x:(bool, bool)) -> 
+    match (x).0 with
+    False(_) -> 
+      (x).0
+    True(_) -> 
+      (x).1
+    
+Time(s): 0.00 
+Mem(Kb): 4724
+
+
+synthesizer :nofilter
+prog : testcases/basic/bool_bor.mls
+
+let rec (f : ((bool, bool) -> bool)) = 
+  fun (x:(bool, bool)) -> 
+    match (x).0 with
+    False(_) -> 
+      (x).1
+    True(_) -> 
+      (x).0
+    
+Time(s): 0.00 
+Mem(Kb): 4724
+
+
+synthesizer :nofilter
+prog : testcases/basic/bool_impl.mls
+
+let rec (f : ((bool, bool) -> bool)) = 
+  fun (x:(bool, bool)) -> 
+    match (x).0 with
+    False(_) -> 
+      True([])
+    True(_) -> 
+      (x).1
+    
+Time(s): 0.00 
+Mem(Kb): 4724
+
+
+synthesizer :nofilter
+prog : testcases/basic/bool_neg.mls
+
+let rec (f : (bool -> bool)) = 
+  fun (x:bool) -> 
+    match x with
+    False(_) -> 
+      True([])
+    True(_) -> 
+      False([])
+    
+Time(s): 0.00 
+Mem(Kb): 3160
+
+
+synthesizer :nofilter
+prog : testcases/basic/bool_xor.mls
+
+let rec (f : ((bool, bool) -> bool)) = 
+  fun (x:(bool, bool)) -> 
+    match (x).0 with
+    False(_) -> 
+      (x).1
+    True(_) -> 
+      match (x).1 with
+      False(_) -> 
+        (x).0
+      True(_) -> 
+        False([])
+      
+    
+Time(s): 0.00 
+Mem(Kb): 4728
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_append.mls
+
+let rec (f : ((list, list) -> list)) = 
+  fun (x:(list, list)) -> 
+    match (x).0 with
+    Nil(_) -> 
+      (x).0
+    Cons(_) -> 
+      match (Un_Cons((x).0)).0 with
+      O(_) -> 
+        Cons([(Un_Cons((x).0)).0, (x).0])
+      S(_) -> 
+        Cons([(Un_Cons((x).0)).0, Cons([O([]), (x).1])])
+      
+    
+Time(s): 0.02 
+Mem(Kb): 8696
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_compress.mls
+
+let rec (f : (list -> list)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      x
+    Cons(_) -> 
+      match (Un_Cons(x)).1 with
+      Nil(_) -> 
+        x
+      Cons(_) -> 
+        match ((compare (Un_Cons(x)).0) (Un_Cons((Un_Cons(x)).1)).0) with
+        EQ(_) -> 
+          (f (Un_Cons(x)).1)
+        GT(_) -> 
+          Cons([(Un_Cons(x)).0, (f (Un_Cons(x)).1)])
+        LT(_) -> 
+          Cons([(Un_Cons(x)).0, (f (Un_Cons(x)).1)])
+        
+      
+    
+Time(s): 5.99 
+Mem(Kb): 12068
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_concat.mls
+
+let rec (f : (llist -> list)) = 
+  fun (x:llist) -> 
+    match x with
+    LNil(_) -> 
+      Nil([])
+    LCons(_) -> 
+      ((append (f (Un_LCons(x)).1)) (Un_LCons(x)).0)
+    
+Time(s): 0.02 
+Mem(Kb): 5972
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_drop.mls
+
+let rec (f : ((list, nat) -> list)) = 
+  fun (x:(list, nat)) -> 
+    match (x).0 with
+    Nil(_) -> 
+      (x).0
+    Cons(_) -> 
+      match (x).1 with
+      O(_) -> 
+        (x).0
+      S(_) -> 
+        (f [(Un_Cons((x).0)).1, Un_S((x).1)])
+      
+    
+Time(s): 0.02 
+Mem(Kb): 8956
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_even_parity.mls
+
+let rec (f : (list -> bool)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      True([])
+    Cons(_) -> 
+      match (Un_Cons(x)).0 with
+      False(_) -> 
+        (f (Un_Cons(x)).1)
+      True(_) -> 
+        (bnot (f (Un_Cons(x)).1))
+      
+    
+Time(s): 0.01 
+Mem(Kb): 5248
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_filter.mls
+
+let rec (f : (((nat -> bool), list) -> list)) = 
+  fun (x:((nat -> bool), list)) -> 
+    match (x).1 with
+    Nil(_) -> 
+      (x).1
+    Cons(_) -> 
+      match ((x).0 S((Un_Cons((x).1)).0)) with
+      False(_) -> 
+        (x).1
+      True(_) -> 
+        match (Un_Cons((x).1)).0 with
+        O(_) -> 
+          (Un_Cons((x).1)).1
+        S(_) -> 
+          Cons([O([]), Nil([])])
+        
+      
+    
+Time(s): 0.02 
+Mem(Kb): 5376
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_fold.mls
+
+let rec (f : (((nat -> (nat -> nat)), nat, list) -> nat)) = 
+  fun (x:((nat -> (nat -> nat)), nat, list)) -> 
+    match (x).2 with
+    Nil(_) -> 
+      (x).1
+    Cons(_) -> 
+      ((count_odd S(((count_odd (Un_Cons((x).2)).0) (Un_Cons((x).2)).0))) (Un_Cons((x).2)).0)
+    
+Time(s): 0.05 
+Mem(Kb): 6100
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_hd.mls
+
+let rec (f : (list -> nat)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      O([])
+    Cons(_) -> 
+      (Un_Cons(x)).0
+    
+Time(s): 0.01 
+Mem(Kb): 5188
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_inc.mls
+
+let rec (f : (list -> list)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      x
+    Cons(_) -> 
+      Cons([S((Un_Cons(x)).0), (f (Un_Cons(x)).1)])
+    
+Time(s): 0.01 
+Mem(Kb): 5408
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_last.mls
+
+let rec (f : (list -> natopt)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      None([])
+    Cons(_) -> 
+      match (Un_Cons(x)).1 with
+      Nil(_) -> 
+        Some((Un_Cons(x)).0)
+      Cons(_) -> 
+        (f (Un_Cons(x)).1)
+      
+    
+Time(s): 0.01 
+Mem(Kb): 5480
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_length.mls
+
+let rec (f : (list -> nat)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      O([])
+    Cons(_) -> 
+      S((f (Un_Cons(x)).1))
+    
+Time(s): 0.01 
+Mem(Kb): 4884
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_map.mls
+
+let rec (f : (((nat -> nat), list) -> list)) = 
+  fun (x:((nat -> nat), list)) -> 
+    match (x).1 with
+    Nil(_) -> 
+      (x).1
+    Cons(_) -> 
+      Cons([((x).0 (Un_Cons((x).1)).0), (f [(x).0, (Un_Cons((x).1)).1])])
+    
+Time(s): 0.02 
+Mem(Kb): 5664
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_nth.mls
+
+let rec (f : ((list, nat) -> nat)) = 
+  fun (x:(list, nat)) -> 
+    match (x).0 with
+    Nil(_) -> 
+      O([])
+    Cons(_) -> 
+      match (x).1 with
+      O(_) -> 
+        (Un_Cons((x).0)).0
+      S(_) -> 
+        (f [(Un_Cons((x).0)).1, Un_S((x).1)])
+      
+    
+Time(s): 0.02 
+Mem(Kb): 7404
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_pairwise_swap.mls
+
+let rec (f : (list -> list)) =
+  fun (x:list) ->
+    match x with
+    Nil(_) ->
+      x
+    Cons(_) ->
+      match (Un_Cons(x)).1 with
+      Nil(_) ->
+        (Un_Cons(x)).1
+      Cons(_) ->
+        Cons([(Un_Cons((Un_Cons(x)).1)).0, Cons([(Un_Cons(x)).0, (f (Un_Cons((Un_Cons(x)).1)).1)])])
+
+
+Time(s): 0.03
+Mem(Kb): 5344
+
+synthesizer :nofilter
+prog : testcases/basic/list_rev_append.mls
+
+let rec (f : (list -> list)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      x
+    Cons(_) -> 
+      match (Un_Cons(x)).1 with
+      Nil(_) -> 
+        x
+      Cons(_) -> 
+        ((append (f (Un_Cons((Un_Cons(x)).1)).1)) Cons([(Un_Cons(x)).0, Cons([O([]), Nil([])])]))
+      
+    
+Time(s): 0.06 
+Mem(Kb): 6152
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_rev_fold.mls
+
+let rec (f : (list -> list)) = 
+  fun (x:list) -> 
+    (((fold snoc) Nil([])) x)
+Time(s): 0.00 
+Mem(Kb): 4372
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_rev_snoc.mls
+
+let rec (f : (list -> list)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      x
+    Cons(_) -> 
+      ((snoc (f (Un_Cons(x)).1)) (Un_Cons(x)).0)
+    
+Time(s): 0.02 
+Mem(Kb): 6512
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_rev_tailcall.mls
+
+let rec (f : ((list, list) -> list)) = 
+  fun (x:(list, list)) -> 
+    match (x).0 with
+    Nil(_) -> 
+      (x).0
+    Cons(_) -> 
+      match (Un_Cons((x).0)).1 with
+      Nil(_) -> 
+        (x).0
+      Cons(_) -> 
+        Cons([S((Un_Cons((x).0)).0), Cons([O([]), (x).1])])
+      
+    
+Time(s): 0.01 
+Mem(Kb): 5168
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_snoc.mls
+
+let rec (f : ((list, nat) -> list)) = 
+  fun (x:(list, nat)) -> 
+    match (x).0 with
+    Nil(_) -> 
+      Cons([(x).1, (x).0])
+    Cons(_) -> 
+      Cons([(Un_Cons((x).0)).0, (f [(Un_Cons((x).0)).1, (x).1])])
+    
+Time(s): 0.01 
+Mem(Kb): 7060
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_sort_sorted_insert.mls
+
+let rec (f : (list -> list)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      x
+    Cons(_) -> 
+      ((insert (f (Un_Cons(x)).1)) (Un_Cons(x)).0)
+    
+Time(s): 0.03 
+Mem(Kb): 7148
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_sorted_insert.mls
+
+let rec (f : ((list, nat) -> list)) = 
+  fun (x:(list, nat)) -> 
+    match (x).0 with
+    Nil(_) -> 
+      Cons([(x).1, (x).0])
+    Cons(_) -> 
+      match ((compare (x).1) (Un_Cons((x).0)).0) with
+      EQ(_) -> 
+        (x).0
+      GT(_) -> 
+        Cons([(Un_Cons((x).0)).0, (f [(Un_Cons((x).0)).1, (x).1])])
+      LT(_) -> 
+        Cons([(x).1, (x).0])
+      
+    
+Time(s): 0.24 
+Mem(Kb): 10464
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_stutter.mls
+
+let rec (f : (list -> list)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      x
+    Cons(_) -> 
+      Cons([(Un_Cons(x)).0, Cons([(Un_Cons(x)).0, (f (Un_Cons(x)).1)])])
+    
+Time(s): 0.01 
+Mem(Kb): 4840
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_sum.mls
+
+let rec (f : (list -> nat)) = 
+  fun (x:list) -> 
+    (((fold add) O([])) x)
+Time(s): 0.00 
+Mem(Kb): 4288
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_take.mls
+
+let rec (f : ((nat, list) -> list)) = 
+  fun (x:(nat, list)) -> 
+    match (x).1 with
+    Nil(_) -> 
+      (x).1
+    Cons(_) -> 
+      match (x).0 with
+      O(_) -> 
+        Nil([])
+      S(_) -> 
+        Cons([(Un_Cons((x).1)).0, (f [Un_S((x).0), (Un_Cons((x).1)).1])])
+      
+    
+Time(s): 0.02 
+Mem(Kb): 6656
+
+
+synthesizer :nofilter
+prog : testcases/basic/list_tl.mls
+
+let rec (f : (list -> list)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      x
+    Cons(_) -> 
+      (Un_Cons(x)).1
+    
+Time(s): 0.01 
+Mem(Kb): 4868
+
+
+synthesizer :nofilter
+prog : testcases/basic/nat_add.mls
+
+let rec (f : ((nat, nat) -> nat)) = 
+  fun (x:(nat, nat)) -> 
+    match (x).0 with
+    O(_) -> 
+      (x).1
+    S(_) -> 
+      S((f [Un_S((x).0), (x).1]))
+    
+Time(s): 0.07 
+Mem(Kb): 23016
+
+
+synthesizer :nofilter
+prog : testcases/basic/nat_iseven.mls
+
+let rec (f : (nat -> bool)) = 
+  fun (x:nat) -> 
+    match x with
+    O(_) -> 
+      True([])
+    S(_) -> 
+      match Un_S(x) with
+      O(_) -> 
+        False([])
+      S(_) -> 
+        (f Un_S(Un_S(x)))
+      
+    
+Time(s): 0.00 
+Mem(Kb): 4632
+
+
+synthesizer :nofilter
+prog : testcases/basic/nat_max.mls
+
+let rec (f : ((nat, nat) -> nat)) = 
+  fun (x:(nat, nat)) -> 
+    match ((compare (x).0) (x).1) with
+    EQ(_) -> 
+      (x).0
+    GT(_) -> 
+      (x).0
+    LT(_) -> 
+      (x).1
+    
+Time(s): 0.13 
+Mem(Kb): 25284
+
+
+synthesizer :nofilter
+prog : testcases/basic/nat_pred.mls
+
+let rec (f : (nat -> nat)) = 
+  fun (x:nat) -> 
+    match x with
+    O(_) -> 
+      x
+    S(_) -> 
+      Un_S(x)
+    
+Time(s): 0.00 
+Mem(Kb): 4708
+
+
+synthesizer :nofilter
+prog : testcases/basic/tree_binsert.mls
+
+let rec (f : ((tree, nat) -> tree)) = 
+  fun (x:(tree, nat)) -> 
+    match (x).0 with
+    Leaf(_) -> 
+      Node([(x).0, (x).1, (x).0])
+    Node(_) -> 
+      match ((comp_nat (x).1) (Un_Node((x).0)).1) with
+      CEq(_) -> 
+        (x).0
+      CGt(_) -> 
+        Node([(Un_Node((x).0)).0, (Un_Node((x).0)).1, (f [(Un_Node((x).0)).2, (x).1])])
+      CLt(_) -> 
+        Node([(f [(Un_Node((x).0)).0, (x).1]), (Un_Node((x).0)).1, (Un_Node((x).0)).2])
+      
+    
+Time(s): 13.94 
+Mem(Kb): 32892
+
+
+synthesizer :nofilter
+prog : testcases/basic/tree_collect_leaves.mls
+
+let rec (f : (tree -> list)) = 
+  fun (x:tree) -> 
+    match x with
+    Leaf(_) -> 
+      Nil([])
+    Node(_) -> 
+      ((append (f (Un_Node(x)).0)) Cons([(Un_Node(x)).1, (f (Un_Node(x)).2)]))
+    
+Time(s): 0.05 
+Mem(Kb): 6968
+
+
+synthesizer :nofilter
+prog : testcases/basic/tree_count_leaves.mls
+
+let rec (f : (tree -> nat)) = 
+  fun (x:tree) -> 
+    match x with
+    Leaf(_) -> 
+      S(O([]))
+    Node(_) -> 
+      ((sum (f (Un_Node(x)).0)) (f (Un_Node(x)).2))
+    
+Time(s): 0.05 
+Mem(Kb): 5784
+
+
+synthesizer :nofilter
+prog : testcases/basic/tree_count_nodes.mls
+
+let rec (f : (tree -> nat)) = 
+  fun (x:tree) -> 
+    match x with
+    Leaf(_) -> 
+      O([])
+    Node(_) -> 
+      ((sum (f (Un_Node(x)).0)) S((f (Un_Node(x)).2)))
+    
+Time(s): 0.14 
+Mem(Kb): 19036
+
+
+synthesizer :nofilter
+prog : testcases/basic/tree_inorder.mls
+
+let rec (f : (tree -> list)) = 
+  fun (x:tree) -> 
+    match x with
+    Leaf(_) -> 
+      Nil([])
+    Node(_) -> 
+      ((append (f (Un_Node(x)).0)) Cons([(Un_Node(x)).1, (f (Un_Node(x)).2)]))
+    
+Time(s): 0.13 
+Mem(Kb): 8716
+
+
+synthesizer :nofilter
+prog : testcases/basic/tree_map.mls
+
+let rec (f : (((nat -> nat), tree) -> tree)) = 
+  fun (x:((nat -> nat), tree)) -> 
+    match (x).1 with
+    Leaf(_) -> 
+      (x).1
+    Node(_) -> 
+      Node([(f [(x).0, (Un_Node((x).1)).0]), ((x).0 (Un_Node((x).1)).1), (f [(x).0, (Un_Node((x).1)).2])])
+    
+Time(s): 0.04 
+Mem(Kb): 9628
+
+
+synthesizer :nofilter
+prog : testcases/basic/tree_nodes_at_level.mls
+
+let rec (f : ((tree, nat) -> nat)) = 
+  fun (x:(tree, nat)) -> 
+    match (x).0 with
+    Leaf(_) -> 
+      O([])
+    Node(_) -> 
+      match (x).1 with
+      O(_) -> 
+        S((x).1)
+      S(_) -> 
+        ((sum (f [(Un_Node((x).0)).0, Un_S((x).1)])) (f [(Un_Node((x).0)).2, Un_S((x).1)]))
+      
+    
+Time(s): 0.29 
+Mem(Kb): 13868
+
+
+synthesizer :nofilter
+prog : testcases/basic/tree_postorder.mls
+
+let rec (f : (tree -> list)) = 
+  fun (x:tree) -> 
+    match x with
+    Leaf(_) -> 
+      Nil([])
+    Node(_) -> 
+      ((append ((append (f (Un_Node(x)).0)) (f (Un_Node(x)).2))) Cons([(Un_Node(x)).1, Nil([])]))
+    
+Time(s): 0.43 
+Mem(Kb): 20756
+
+
+synthesizer :nofilter
+prog : testcases/basic/tree_preorder.mls
+
+let rec (f : (tree -> list)) = 
+  fun (x:tree) -> 
+    match x with
+    Leaf(_) -> 
+      Nil([])
+    Node(_) -> 
+      ((append Cons([(Un_Node(x)).1, (f (Un_Node(x)).0)])) (f (Un_Node(x)).2))
+    
+Time(s): 0.09 
+Mem(Kb): 8572
+
+
+synthesizer :nofilter
+prog : testcases/new/expr_b.mls
+
+Command exited with non-zero status 124
+Time(s): 120.00 
+Mem(Kb): 61024
+
+
+synthesizer :nofilter
+prog : testcases/new/expr.mls
+
+let rec (f : (exp -> nat)) = 
+  fun (x:exp) -> 
+    match x with
+    INT(_) -> 
+      Un_INT(x)
+    ADD(_) -> 
+      ((add (f (Un_ADD(x)).0)) (f (Un_ADD(x)).1))
+    MUL(_) -> 
+      ((mul (f (Un_MUL(x)).0)) (f (Un_MUL(x)).1))
+    
+Time(s): 8.56 
+Mem(Kb): 25956
+
+
+synthesizer :nofilter
+prog : testcases/new/expr_sub.mls
+
+Command exited with non-zero status 124
+Time(s): 120.01 
+Mem(Kb): 53772
+
+
+synthesizer :nofilter
+prog : testcases/new/expr_div.mls
+
+Command exited with non-zero status 124
+Time(s): 119.99 
+Mem(Kb): 177344
+
+
+synthesizer :nofilter
+prog : testcases/new/list_dropeven.mls
+
+let rec (f : (list -> list)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      x
+    Cons(_) -> 
+      match (is_even (Un_Cons(x)).0) with
+      False(_) -> 
+        Cons([(Un_Cons(x)).0, (f (Un_Cons(x)).1)])
+      True(_) -> 
+        (Un_Cons(x)).1
+      
+    
+Time(s): 0.01 
+Mem(Kb): 5480
+
+
+synthesizer :nofilter
+prog : testcases/new/list_last2.mls
+
+let rec (f : (list -> natopt)) = 
+  fun (x:list) -> 
+    match x with
+    Nil(_) -> 
+      None([])
+    Cons(_) -> 
+      match (Un_Cons(x)).1 with
+      Nil(_) -> 
+        None([])
+      Cons(_) -> 
+        match (Un_Cons((Un_Cons(x)).1)).1 with
+        Nil(_) -> 
+          Some([(Un_Cons(x)).0, (Un_Cons((Un_Cons(x)).1)).0])
+        Cons(_) -> 
+          (f (Un_Cons(x)).1)
+        
+      
+    
+Time(s): 0.02 
+Mem(Kb): 6432
+
+
+synthesizer :nofilter
+prog : testcases/new/list_make.mls
+
+let rec (f : (nat -> list)) = 
+  fun (x:nat) -> 
+    match x with
+    O(_) -> 
+      Nil([])
+    S(_) -> 
+      Cons([O([]), (f Un_S(x))])
+    
+Time(s): 0.01 
+Mem(Kb): 5288
+
+
+synthesizer :nofilter
+prog : testcases/new/list_range.mls
+
+let rec (f : ((nat, nat) -> list)) = 
+  fun (x:(nat, nat)) -> 
+    match (x).0 with
+    O(_) -> 
+      Cons([(x).0, Nil([])])
+    S(_) -> 
+      match ((compare (x).1) Un_S((x).0)) with
+      EQ(_) -> 
+        Cons([(x).0, Cons([(x).1, Nil([])])])
+      GT(_) -> 
+        Cons([(x).0, Nil([])])
+      LT(_) -> 
+        Cons([(x).0, (f [Un_S((x).0), (x).1])])
+      
+    
+Time(s): 0.24 
+Mem(Kb): 18544
+
+
+synthesizer :nofilter
+prog : testcases/new/nat_mul.mls
+
+let rec (f : ((nat, nat) -> nat)) = 
+  fun (x:(nat, nat)) -> 
+    match (x).1 with
+    O(_) -> 
+      (x).1
+    S(_) -> 
+      ((add (f [Un_S((x).1), (x).0])) (x).0)
+    
+Time(s): 1.04 
+Mem(Kb): 29000
+
+
+synthesizer :nofilter
+prog : testcases/new/nat_sub.mls
+
+let rec (f : ((nat, nat) -> nat)) = 
+  fun (x:(nat, nat)) -> 
+    match (x).0 with
+    O(_) -> 
+      (x).0
+    S(_) -> 
+      match (x).1 with
+      O(_) -> 
+        (x).0
+      S(_) -> 
+        (f [Un_S((x).0), Un_S((x).1)])
+      
+    
+Time(s): 0.08 
+Mem(Kb): 23024
+
+
+synthesizer :nofilter
+prog : testcases/new/tree_balanced.mls
+
+let rec (f : (tree -> bool)) = 
+  fun (x:tree) -> 
+    match x with
+    Leaf(_) -> 
+      True([])
+    Node(_) -> 
+      match (Un_Node(x)).1 with
+      Leaf(_) -> 
+        True([])
+      Node(_) -> 
+        match ((compare (height (Un_Node((Un_Node(x)).1)).2)) S(O([]))) with
+        EQ(_) -> 
+          True([])
+        GT(_) -> 
+          False([])
+        LT(_) -> 
+          match (Un_Node((Un_Node(x)).1)).1 with
+          Leaf(_) -> 
+            True([])
+          Node(_) -> 
+            False([])
+          
+        
+      
+    
+Time(s): 96.76 
+Mem(Kb): 61012
+
+
+synthesizer :nofilter
+prog : testcases/new/tree_height.mls
+
+Command exited with non-zero status 124
+Time(s): 120.00 
+Mem(Kb): 25888
+
+
+synthesizer :nofilter
+prog : testcases/new/tree_lastleft.mls
+
+let rec (f : (tree -> nat)) = 
+  fun (x:tree) -> 
+    match x with
+    Leaf(_) -> 
+      O([])
+    Node(_) -> 
+      match (Un_Node(x)).1 with
+      Leaf(_) -> 
+        (Un_Node(x)).0
+      Node(_) -> 
+        (f (Un_Node(x)).1)
+      
+    
+Time(s): 0.22 
+Mem(Kb): 18432
+
+
+synthesizer :nofilter
+prog : testcases/new/tree_notexist.mls
+
+Command exited with non-zero status 124
+Time(s): 120.00 
+Mem(Kb): 37096
+
+
+synthesizer :nofilter
+prog : testcases/new/tree_sum.mls
+
+let rec (f : (tree -> nat)) = 
+  fun (x:tree) -> 
+    match x with
+    Leaf(_) -> 
+      O([])
+    Node(_) -> 
+      ((add (f (Un_Node(x)).1)) ((add (f (Un_Node(x)).2)) (Un_Node(x)).0))
+    
+Time(s): 0.44 
+Mem(Kb): 20800
+
+
