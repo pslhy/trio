@@ -1,5 +1,5 @@
 let debug = ref false
-let max_size = ref 32
+let max_size = ref 128
 let max_height = ref 6
 let max_deduc = ref 6
 let init_trace_comp_size = ref 2
