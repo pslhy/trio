@@ -114,5 +114,3 @@ let rec process (unprocessed : t_unprocessed) : t =
 	let spec = process_spec (ec,tc,td,vc) uspec in
 	{synth_type = synth_type; ec = ec; tc = tc; td = td; vc = vc; spec = spec}
 	
-	
-	

@@ -1,6 +1,0 @@
-include "bool.decls"
-
-synth bool -> bool satisfying
-
-[True] -> False,
-[False] -> False

@@ -1,0 +1,34 @@
+type nat =
+  | O
+  | S of nat
+
+type bool =
+  | True
+  | False
+
+type list =
+  | Nil
+  | Cons of nat * list
+
+let is_even =
+  fix (is_even : nat -> bool) =
+    fun (x1 : nat) ->
+      match x1 with
+      | O -> True
+      | S x1p ->
+        (match x1p with
+         | O -> False
+         | S x1pp -> is_even x1pp)
+;;
+
+synth list -> list satisfying
+
+equiv
+
+fix (f : list -> list) =
+  fun (x:list) ->
+    match x with
+    | Nil -> Nil
+    | Cons (h,tl) -> match is_even h with
+                     | True -> tl
+                     | False -> Cons(h, f tl)

@@ -2,10 +2,6 @@ type nat =
   | O
   | S of nat
 
-type bool =
-  | True
-  | False
-
 type cmp =
   | LT
   | EQ
@@ -42,8 +38,8 @@ synth tree -> nat satisfying
 
 [Leaf] -> 0,
 [Node (2, Leaf, Leaf)] -> 2,
-[Node (0, Node (1, Leaf, Leaf), Leaf)] -> 1,
+[Node (1, Node (1, Leaf, Leaf), Leaf)] -> 1,
 [Node (0, Node (7, Node (2, Leaf, Leaf), Leaf), Leaf)] -> 7,
-[Node (0, Node (1, Node (3, Leaf, Leaf), Node (4, Leaf, Leaf)), Node (2, Leaf, Leaf))] -> 4,
-[Node (0, Node (1, Node (3, Leaf, Leaf), Node (4, Leaf, Node (5, Leaf, Leaf))), Node (2, Leaf, Leaf))] ->  5,
- 
+[Node (3, Node (1, Node (3, Leaf, Leaf), Node (4, Leaf, Leaf)), Node (2, Leaf, Leaf))] -> 4,
+[Node (2, Node (1, Node (3, Leaf, Leaf), Node (4, Leaf, Node (5, Leaf, Leaf))), Node (2, Leaf, Leaf))] ->  5,
+[Node (1, Leaf, Node(3, Leaf, Leaf))] -> 3,

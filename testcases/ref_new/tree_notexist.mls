@@ -1,0 +1,52 @@
+type nat =
+  | O
+  | S of nat
+
+type bool =
+  | True
+  | False
+
+type tree =
+  | Leaf
+  | Node of nat * tree * tree
+
+type cmp =
+  | LT
+  | EQ
+  | GT
+
+let compare =
+  fix (compare : nat -> nat -> cmp) =
+    fun (x1 : nat) ->
+      fun (x2 : nat) ->
+        match x1 with
+        | O -> (match x2 with
+                | O -> EQ
+                | S _ -> LT)
+        | S x1 -> (match x2 with
+                | O -> GT
+                | S x2 -> compare x1 x2)
+;;
+
+let band =
+ fix (band : bool -> bool -> bool) =
+  fun (x: bool) ->
+   fun (y: bool) ->
+    match x with
+     | False -> x
+     | True -> y
+;;
+
+synth nat -> tree -> bool satisfying
+
+equiv
+
+fix (f : nat -> tree -> bool) =
+  fun (x:nat) -> 
+   fun (t:tree) ->
+    match t with
+      | Leaf _ -> True
+      | Node (v,l,r) -> (match compare x v with
+                        | EQ _ -> False
+                        | LT _ -> band (f x l) (f x r)
+                        | GT _ -> band (f x l) (f x r))

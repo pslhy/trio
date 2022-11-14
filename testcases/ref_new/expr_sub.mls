@@ -1,0 +1,51 @@
+type nat = 
+| O 
+| S of nat 
+
+type exp = 
+| INT of nat 
+| ADD of exp * exp 
+| SUB of exp * exp
+| MUL of exp * exp 
+
+let add =
+  fix (add : nat -> nat -> nat) =
+    fun (n1 : nat) ->
+      fun (n2 : nat) ->
+        match n1 with
+        | O -> n2
+        | S n1p -> S (add n1p n2)
+;;
+
+let sub =
+  fix (sub : nat -> nat -> nat) =
+    fun (n1 : nat) ->
+      fun (n2 : nat) ->
+        match n1 with
+        | O -> O
+        | S n1p -> match n2 with
+                    | O -> n1
+                    | S n2p -> (sub n1p n2p)
+;;
+
+let mul =
+  fix (mul : nat -> nat -> nat) =
+    fun (n1 : nat) ->
+      fun (n2 : nat) ->
+        match n1 with
+        | O -> O 
+        | S n1p -> add n2 (mul n1p n2)
+;;
+
+
+synth exp -> nat satisfying 
+
+equiv
+
+fix (f : exp -> nat) =
+  fun (x:exp) ->
+    match x with
+      | INT n -> n
+      | ADD (e1,e2) -> add (f e1) (f e2)
+      | SUB (e1,e2) -> sub (f e1) (f e2)
+      | MUL (e1,e2) -> mul (f e1) (f e2)

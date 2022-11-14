@@ -1,0 +1,51 @@
+type nat = 
+| O 
+| S of nat 
+
+type circuit =
+| IN
+| AND of circuit * circuit
+| OR of circuit * circuit
+
+type cmp =
+  | LT
+  | EQ
+  | GT
+
+let compare =
+  fix (compare : nat -> nat -> cmp) =
+    fun (x1 : nat) ->
+      fun (x2 : nat) ->
+        match x1 with
+        | O -> (match x2 with
+                | O -> EQ
+                | S _ -> LT)
+        | S x1 -> (match x2 with
+                | O -> GT
+                | S x2 -> compare x1 x2)
+;;
+
+let max =
+  fix (max : nat -> nat -> nat) =
+    fun (x:nat) ->
+     fun (y:nat) ->
+      match (compare x y) with
+        | LT _ -> x
+        | EQ _ -> x
+        | GT _ -> y
+;;
+
+synth circuit -> nat satisfying
+
+[IN] -> 0,
+[AND (IN, IN)] -> 1,
+[OR (IN, IN)] -> 0,
+
+equiv 
+
+fix (f : circuit -> nat) =
+  fun (x:circuit) ->
+    match x with
+    | IN -> 0
+    | AND (c1, c2) -> S (max (f c1) (f c2))
+    | OR (c1, c2) -> (max (f c1) (f c2))
