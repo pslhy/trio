@@ -4,10 +4,6 @@ open Vocab
 open BidirectionalUtils
 open Generator
 
-(* (int list (points) * signature) -> vsa * depth *)
-(* let learn_cache : (int list * signature, (vsa * int)) BatMap.t ref = ref BatMap.empty
-let now_learning : (int list * signature) BatSet.t ref = ref BatSet.empty  *)
-
 let trace_vsas : vsa list ref = ref []
 
 module Candidate = 
@@ -190,22 +186,8 @@ and learn candidate addr available_uncons pts spec (desired_sig, desired_type) (
 			let inputs = List.map fst spec.spec in
 			BatSet.fold (fun rec_expr acc ->
 				let plugged = plug candidate (addr, rec_expr) in 
-				(* let _ = my_prerr_endline (Printf.sprintf "plugged : %s" (Expr.show plugged)) in *)
-				(* let violate_angelic_assumption = 
-					match rec_expr with 
-					| App (Var i, arg_exp) when BatString.equal i target_func -> 
-						let arg_vals = compute_signature spec inputs arg_exp in 
-						let _ = my_prerr_endline (Printf.sprintf "arg_vals : %s" (string_of_signature arg_vals)) in
-						let sg_pts = compute_signature spec (elems_of_indices pts arg_vals) plugged in 
-						let _ = my_prerr_endline (Printf.sprintf "sig_pts : %s" (string_of_signature sg_pts)) in
-						let _ = my_prerr_endline (Printf.sprintf "desired_sig_pts : %s" (string_of_signature desired_sig_pts)) in
-						not (List.for_all2 (fun v1 v2 -> match_exprs (exp_of_value v1) (exp_of_value v2)) sg_pts desired_sig_pts)
-					| _ -> false 
-				in
-				if violate_angelic_assumption then result 
-				else *)
-					let _ = my_prerr_endline (Printf.sprintf "direct: plugging recursive %s into %s and obtain %s" (Expr.show rec_expr) (Expr.show candidate) (Expr.show plugged)) in 
-					BatSet.add (plugged, []) acc
+				let _ = my_prerr_endline (Printf.sprintf "direct: plugging recursive %s into %s and obtain %s" (Expr.show rec_expr) (Expr.show candidate) (Expr.show plugged)) in 
+				BatSet.add (plugged, []) acc
 			) rec_exprs result
 		in
 		(* 다른 rule 들 사용한 결과 추가 *)
@@ -214,26 +196,8 @@ and learn candidate addr available_uncons pts spec (desired_sig, desired_type) (
 				let result = 
 					learn_func candidate addr available_uncons pts spec (desired_sig, desired_type) (ty_to_exprs, ty_to_sigs, sig_to_expr)
 				in
-				(* let _ = 
-				if not (BatSet.is_empty result) then 
-					BatSet.iter (fun (next_candidate, hole_infos) -> 
-						let _ = 
-							my_prerr_endline (Printf.sprintf "learned next_candidate: %s" (Expr.show next_candidate))
-						in
-						let _ = 
-							my_prerr_endline (Printf.sprintf "learned hole_infos: %s" 
-								(string_of_list (fun (addr,_,(pts,_,_)) -> 
-									Printf.sprintf "addr - %s, pts - %s"
-									(string_of_list string_of_int addr)
-									(string_of_list string_of_int pts)) hole_infos 
-							)
-							) 
-						in 
-						()
-					) result 
-				in *)
 				BatSet.union result acc 
-			) (*BatSet.empty*) result learn_funcs
+			) result learn_funcs
 		in 
 		result 	  
 
@@ -256,7 +220,6 @@ and learn_ctor candidate addr available_uncons pts spec (desired_sig, _) _ =
 				if (BatList.is_empty addr) then Wildcard 
 				else get_expr_from_addr candidate (BatList.remove_at ((List.length addr) - 1) addr) 
 			in 
-			(* let _ = my_prerr_endline (Printf.sprintf "parent: %s" (show parent_expr)) in *)
 			let is_redundant_subproblem = 
 				match parent_expr with 
 				| Unctor (i, _) -> (BatString.equal i constructor)
@@ -389,32 +352,6 @@ and learn_proj candidate addr available_uncons pts spec (desired_sig, desired_ty
 	-> Proj (i, Tuple(..., ei, ...)) 
 		 a,b-th elements of [[ei]] are v_a, v_b *)
 	let _ = assert (not (BatList.is_empty desired_sig_pts)) in 
-	(* BatMap.foldi (fun ty _ result -> 
-		if not (Type.is_tuple_type ty) then result 
-		else
-			let tys = Type.destruct_tuple ty in 
-			if not (List.mem desired_type tys) then result 
-			else 
-				let ind = BatOption.get (BatList.index_of desired_type tys) in
-				let ekind = Proj (ind, Wildcard) in
-				let plugged = plug candidate (addr, ekind) in
-				let addr' = addr @ [1] in
-				let desired_type' = ty in 
-				let desired_sig' = 
-					BatList.mapi (fun i v ->
-						if List.mem i pts then 
-							let desired_value = (List.nth desired_sig i) in 
-							let tuplev = 
-								BatList.mapi (fun i' _ -> if i' = ind then desired_value else WildcardV) tys
-							in
-							TupleV tuplev 
-						else v
-					) desired_sig 
-				in
-				BatSet.add (plugged, [(addr', available_uncons, (pts, desired_sig', desired_type'))]) result
-
-	) ty_to_exprs BatSet.empty *)
-
 	(* only non-recursive components are considered
 		 because recursive components are not in sig_to_expr *)
 	BatMap.foldi (fun sg expr result ->
@@ -609,49 +546,6 @@ and learn_app candidate addr available_uncons pts spec (desired_sig, desired_typ
 		get_valid_recursive_components output_ty ty_to_exprs available_uncons scrutinees
 		|> BatSet.elements 
 	in
-
-	(* let rec_call_exprs = 
-		let f_arg_exprs_list : Expr.t list list =
-			List.map (fun arg_ty ->
-				BatMap.find arg_ty ty_to_exprs
-				|> BatSet.filter (contains_id target_func_arg)
-				|> BatSet.filter (fun e -> (BatSet.is_empty (get_constructors e))) (* 필요? *)
-				|> BatSet.filter (fun e -> using_allowed_unconstructor e available_uncons)
-				|> BatSet.filter (fun e -> 
-						(not (BatSet.is_empty (get_unconstructors e))) || 
-						(match e with 
-						| Tuple es -> 
-							(* to avoid 
-								match (x).0 with
-								Cons(_) -> (f ((x).0, (x).0))
-								Nil(_) -> _ 
-
-								but the following is okay (because it involves an unconstructor)
-								(match Un_Cons x . 1 with
-									| Nil _ -> Some (Un_Cons x . 0)
-									| Cons _ -> f (Un_Cons x . 1))
-
-								*)
-							not (List.exists (fun e -> BatSet.mem e scrutinees) es)
-						| _ -> 
-							not (BatSet.mem e scrutinees)
-						)
-					)
-				|> BatSet.elements 
-			) arg_tys
-			|> BatList.n_cartesian_product
-		in
-		List.fold_left (fun result arg_exprs -> 
-			let arg_expr = 
-				if List.length arg_exprs = 1 then List.hd arg_exprs 
-				else Tuple arg_exprs
-			in
-			let ekind = App(Var target_func, arg_expr) in 
-			ekind :: result
-		) [] f_arg_exprs_list 
-	in *)
-
-
 	let _= my_prerr_endline (Printf.sprintf "rec_exprs : %s" (string_of_list Expr.show rec_exprs)) in
 	let result_rec = 
 		if not (Type.equal output_ty desired_type) then BatSet.empty
@@ -757,358 +651,6 @@ and learn_app candidate addr available_uncons pts spec (desired_sig, desired_typ
 	in
 	BatSet.union result_rec result_lib
 
-
-(* 
-
-		(* desired_fun_argvs : for each desired output o_i, triple of (f, fun_ty, v1...vk) s.t. (..(f v1)..vk)..) = o_i *)		
-		let desired_fun_argvs_lst = 
-			BatList.mapi (fun i output -> 
-				if (BatList.mem i pts) && (BatMap.mem output !Tracelearner.library) then 
-					BatMap.find output !Tracelearner.library
-				else 
-					(* dummy for cartesian product computation *)
-					[(WildcardV, Type._unit, [WildcardV])]
-			) desired_sig
-			|> BatList.n_cartesian_product
-		in 
-		List.fold_left (fun result desired_fun_argvs -> 
-			let _ = assert ((List.length desired_fun_argvs) = List.length desired_sig) in
-			(* desired_fun_argvs : for each desired output o_i, triple of (f, fun_ty, v1...vk) s.t. (..(f v1)..vk)..) = o_i *)
-			let funcv_tys = 
-				List.fold_left (fun acc (funcv,fun_ty,_) -> 
-					if is_wildcard_value funcv then acc else BatSet.add (funcv,fun_ty) acc
-				) BatSet.empty desired_fun_argvs
-			in
-			let is_single_funv = (BatSet.cardinal funcv_tys) = 1 in 
-			if not is_single_funv then result
-			else 
-				let funcv, fun_ty = BatSet.choose funcv_tys in 
-				let funcv_sig = BatList.make (BatList.length desired_sig) funcv in 
-				let _ = assert (BatMap.mem funcv_sig sig_to_expr) in 
-				let fun_expr = BatMap.find funcv_sig sig_to_expr in
-				let (arg_ty, result_ty) = Specification.st_to_pair fun_ty in 
-				let arg_tys = 
-					let _ = assert (Type.equal result_ty desired_type) in 
-					match arg_ty with
-					| Type.Tuple ts -> ts
-					| _ -> [arg_ty]
-				in
-				(* type subgoal = points * signature * Type.t  *)
-				(* type t = Expr.t * (addr * available_uncons * subgoal) list  *)
-				let plugged = 
-					let ekind = List.fold_left (fun acc _ -> App(acc, Wildcard)) Wildcard arg_tys in 
-					plug candidate (addr, ekind) 
-				in 
-				let addrs = 
-					List.fold_left (fun acc _ ->  
-						(* App(App(App(f,a1),a2),a3)  
-						[0;0;0] [0;0;1] [0;1] [1] *)
-						(List.map (fun lst -> 0::lst) acc) @ [[1]]
-					) [ addr@[0] ; addr@[1] ] (List.tl arg_tys) in
-				let _,hole_infos = 
-					let funcv_hole_info = 
-						(List.hd addrs, available_uncons, (pts, BatList.make (List.length desired_sig) funcv, fun_ty))
-					in
-					List.fold_left (fun (arg_index, hole_infos) arg_addr -> 
-						let desired_sig' = 
-							List.fold_left (fun acc (funcv,_,args) -> 
-								if is_wildcard_value funcv then acc @ [WildcardV] 
-								else 
-									let _ = assert ((List.length args) > arg_index) in 
-									acc @ [List.nth args arg_index]
-							) [] desired_fun_argvs 
-						in 
-						let desired_type' = List.nth arg_tys arg_index in 
-						let hole_info = (arg_addr, available_uncons, (pts, desired_sig', desired_type')) in
-						(arg_index + 1, hole_infos @ [hole_info])
-					) (0, [funcv_hole_info]) (List.tl addrs)
-				in 
-				BatSet.add (plugged, hole_infos) result  
-		) BatSet.empty desired_fun_argvs_lst 
-	in  *)
-
-(* 
-	let result_rec = 
-		(* spec: [Nil] -> 0,  [Cons(0,Nil)] -> 1, [Cons(0,Cons(0,Nil))] -> 2 *)
-		(* if desired_sig_pts = [_, 0, 1] *)
-		(*   f (learn [_, Nil, Cons(0,Nil)] [1,2]) *)
-		(*   f (learn [|spec.spec|] x |f arg_len| ) *)
-		(* if desired_sig_pts not in o1, o2 *)
-		(*   f (comp1, comp2), f (comp1', comp2') ... all products of components *)
-		let in_spec = List.for_all (fun v -> List.mem v outputs) desired_sig_pts in
-		if not (Type.equal output_ty desired_type) then BatSet.empty
-		else
-			let result_rec = 
-				(* if in_spec then
-					let _ = my_prerr_endline (Printf.sprintf "learn_app from I/O example") in
-					let desired_sig' =
-						List.map (fun (desired_output, i) ->
-							if not (List.mem i pts) then WildcardV
-							else
-								try BatList.assoc_inv desired_output spec.spec with _ -> assert false
-						) (List.combine desired_sig (BatList.range 0 `To ((List.length desired_sig) - 1)))
-					in
-					let ekind = App(Var target_func, Wildcard) in 
-					let plugged = plug candidate (addr, ekind) in 
-					let addr' = addr @ [1] in 
-					BatSet.singleton (plugged, [(addr', available_uncons, (pts, desired_sig', input_ty))])
-				else  *)
-					BatSet.empty 
-			in
-			let _ = my_prerr_endline (Printf.sprintf "learn_app using components") in
-			let arg_tys =
-				match input_ty with
-				| Type.Tuple ts -> ts
-				| _ -> [input_ty]
-			in
-			let scrutinees = get_scrutinees candidate in
-			(* let _ = my_prerr_endline (Printf.sprintf "scrutinees : %s" (string_of_set show scrutinees)) in *)
-			(* conditions for termination guarnatee: 
-					1) arguments should contain x, 
-					2) no constructors 
-					3) at least one unconstructor
-					4) not a scrutinee of some match expr *)
-			
-			(* list of all possible arg expressions 
-					(TODO: avoid combination explosion via generator) *)
-			
-			let arg_exprs_list : Expr.t list list =
-				List.map (fun arg_ty ->
-					BatMap.find arg_ty ty_to_exprs
-					|> BatSet.filter (contains_id target_func_arg)
-					|> BatSet.filter (fun e -> (BatSet.is_empty (get_constructors e)))
-					|> BatSet.filter (fun e -> using_allowed_unconstructor e available_uncons)
-					|> BatSet.filter (fun e -> 
-							(not (BatSet.is_empty (get_unconstructors e))) || 
-						  (match e with 
-							| Tuple es -> 
-								(* to avoid 
-								  match (x).0 with
-									Cons(_) -> (f ((x).0, (x).0))
-									Nil(_) -> _ 
-
-									but the following is okay (because it involves an unconstructor)
-									(match Un_Cons x . 1 with
-										| Nil _ -> Some (Un_Cons x . 0)
-										| Cons _ -> f (Un_Cons x . 1))
-
-									*)
-								not (List.exists (fun e -> BatSet.mem e scrutinees) es)
-							| _ -> 
-								not (BatSet.mem e scrutinees)
-							)
-						)
-					|> BatSet.elements 
-				) arg_tys
-				|> BatList.n_cartesian_product
-			in
-			(* there are some arguments violating the above conditions; skip *)
-			if BatList.is_empty arg_exprs_list then 
-				let _ = my_prerr_endline (Printf.sprintf "no components usable for arguments") in
-				BatSet.empty
-			else
-				try 
-					List.fold_left (fun result arg_exprs -> 
-						let arg_expr = 
-							if List.length arg_exprs = 1 then List.hd arg_exprs 
-							else Tuple arg_exprs
-						in
-						let ekind = App(Var target_func, arg_expr) in 
-						let plugged = plug candidate (addr, ekind) in 
-						(* from spec : TODO check if it works well *)
-						let _ = 
-							if in_spec then 
-								let sg = compute_signature spec inputs arg_expr in 
-								let is_arg_expr_from_spec = 
-									BatList.for_all (fun pt ->
-										if List.mem pt pts then 
-											let component_output = List.nth sg pt in
-											let desired_output = List.nth desired_sig pt in
-											match BatList.index_of (component_output, desired_output) spec.spec with 
-											| None -> false 
-											| Some i -> i <> pt
-										else true 
-									) pts 
-								in
-								if is_arg_expr_from_spec then raise (SubSolutionFound plugged)
-						in
-						
-						(* let _ = 
-							my_prerr_endline (Printf.sprintf "through concolic eval, checking feasibility of %s" (Expr.show plugged)) 
-						in
-						let feasible = 
-							let filter_fun = if !Options.trace_complete then BatList.for_all else BatList.exists in 
-							filter_fun (fun pt -> 
-								let trace_vsa = (List.nth !trace_vsas pt) in
-								let input = List.nth inputs pt in 
-								let upper_bound = 
-									let max_trace_size = 
-										snd (pgm_size_of_vsa trace_vsa)
-										(* BatList.max (List.map (fun vsa -> snd (pgm_size_of_vsa trace_vsa)) !trace_vsas)  *)
-									in
-									max_trace_size
-								in 
-								try
-									let trace_expr = concolic_eval spec upper_bound plugged input in 
-									let _ = 
-										my_prerr_endline (Printf.sprintf "trace expr: %s" (Expr.show trace_expr)) 
-									in
-									let matched = match_expr_vsa trace_expr trace_vsa in
-									let _ = 
-										my_prerr_endline (Printf.sprintf "matched? %s" (if matched then "yes" else "no"))
-									in
-									matched
-								with exn -> 
-									let _ = my_prerr_endline (Printf.sprintf "exception: %s" (Printexc.to_string exn)) in
-									false 
-							) pts 
-						in 
-						if feasible then  *)
-							BatSet.add (plugged, []) result 
-						(* else result  *)
-					) result_rec arg_exprs_list 
-				with SubSolutionFound plugged -> BatSet.singleton (plugged, [])
-	in
-	(* non recursive functions *)
-	let result_lib = 
-		(* BatSet.empty *)
-		(* library: value -> (closure * fun_type * (arg value list)) list) 
-			 desired_sig: [o1, o2, o3, o4] 
-			 pts: [1, 3]
-			 desired_sig_fun :  [func_v1, o2, func_v1, o4], [func_v2, o2, func_v2, o4] ... 
-			 desired_sig_arg1 : [arg_v1, o2, arg_v1', o4],  [arg_v1'', o2, arg_v1''', o4] ... 
-			 desired_sig_arg2 : [arg_v2, o2, arg_v2', o4],  [arg_v2'', o2, arg_v2''', o4] ... 
-			 ...
-			 desired_sig_argn : [arg_vn, o2, arg_vn', o4],  [arg_vn'', o2, arg_vn''', o4]
-
-			  *)
-		
-		(* desired_fun_argvs : for each desired output o_i, triple of (f, fun_ty, v1...vk) s.t. (..(f v1)..vk)..) = o_i *)		
-		let desired_fun_argvs_lst = 
-			BatList.mapi (fun i output -> 
-				if (BatList.mem i pts) && (BatMap.mem output !Tracelearner.library) then 
-					BatMap.find output !Tracelearner.library
-				else 
-					(* dummy for cartesian product computation *)
-					[(WildcardV, Type._unit, [WildcardV])]
-			) desired_sig
-			|> BatList.n_cartesian_product
-		in 
-		List.fold_left (fun result desired_fun_argvs -> 
-			let _ = assert ((List.length desired_fun_argvs) = List.length desired_sig) in
-			(* desired_fun_argvs : for each desired output o_i, triple of (f, fun_ty, v1...vk) s.t. (..(f v1)..vk)..) = o_i *)
-			let funcv_tys = 
-				List.fold_left (fun acc (funcv,fun_ty,_) -> 
-					if is_wildcard_value funcv then acc else BatSet.add (funcv,fun_ty) acc
-				) BatSet.empty desired_fun_argvs
-			in
-			let is_single_funv = (BatSet.cardinal funcv_tys) = 1 in 
-			if not is_single_funv then result
-			else 
-				let funcv, fun_ty = BatSet.choose funcv_tys in 
-				let (arg_ty, result_ty) = Specification.st_to_pair fun_ty in 
-				let arg_tys = 
-					let _ = assert (Type.equal result_ty desired_type) in 
-					match arg_ty with
-					| Type.Tuple ts -> ts
-					| _ -> [arg_ty]
-				in
-				(* let _ = 
-					List.iter (fun (funcv,fun_ty,argvs) -> 
-						prerr_endline ("funcv : " ^ (Expr.show_value funcv));
-						prerr_endline ("fun_ty : " ^ (Type.show fun_ty));
-						prerr_endline ("argvs : " ^ (string_of_list Expr.show_value argvs));
-						assert ((List.length argvs) = (List.length arg_tys) || (is_wildcard_value funcv))
-					) desired_fun_argvs 
-				in  *)
-				(* type subgoal = points * signature * Type.t  *)
-				(* type t = Expr.t * (addr * available_uncons * subgoal) list  *)
-				let plugged = 
-					let ekind = List.fold_left (fun acc _ -> App(acc, Wildcard)) Wildcard arg_tys in 
-					plug candidate (addr, ekind) 
-				in 
-				let addrs = 
-					List.fold_left (fun acc _ ->  
-						(* App(App(App(f,a1),a2),a3)  
-						[0;0;0] [0;0;1] [0;1] [1] *)
-						(List.map (fun lst -> 0::lst) acc) @ [[1]]
-					) [ addr@[0] ; addr@[1] ] (List.tl arg_tys) in
-				let _,hole_infos = 
-					let funcv_hole_info = 
-						(List.hd addrs, available_uncons, (pts, BatList.make (List.length desired_sig) funcv, fun_ty))
-					in
-					List.fold_left (fun (arg_index, hole_infos) arg_addr -> 
-						let desired_sig' = 
-							List.fold_left (fun acc (funcv,_,args) -> 
-								if is_wildcard_value funcv then acc @ [WildcardV] 
-								else 
-									let _ = assert ((List.length args) > arg_index) in 
-									acc @ [List.nth args arg_index]
-							) [] desired_fun_argvs 
-						in 
-						let desired_type' = List.nth arg_tys arg_index in 
-						let hole_info = (arg_addr, available_uncons, (pts, desired_sig', desired_type')) in
-						(arg_index + 1, hole_infos @ [hole_info])
-					) (0, [funcv_hole_info]) (List.tl addrs)
-				in 
-				BatSet.add (plugged, hole_infos) result  
-		) BatSet.empty desired_fun_argvs_lst 
-		
-
-		(* List.map (fun pt ->
-			let output = List.nth desired_sig pt in
-			if not (BatMap.mem output !Tracelearner.library) then Empty
-			else
-				let funcv_args_list = BatMap.find output !Tracelearner.library in
-				let vsas = 
-  				List.fold_left (fun vsas (funcv, fun_ty, args) ->
-  					try
-  						(* only funcv matters (wildcards are just placeholders) *)
-    					let desired_sig' =
-  							BatList.mapi (fun i v -> if i = pt then funcv else v) 
-  								(BatList.make (List.length desired_sig) WildcardV)
-    					in
-    					let fun_vsa =
-    						(* available_depth = 1 since we are only interested in components *)
-    						learn 1 available_uncons [pt] spec (desired_sig', fun_ty)
-    							(ty_to_exprs, ty_to_sigs, sig_to_expr)
-    					in
-  						let _ = my_prerr_endline (Printf.sprintf "fun_vsa: %s" (string_of_vsa fun_vsa)) in
-    					let _ = if fun_vsa = Empty then raise LearnFailure in
-    					let vsa =
-  							let arg_tys =
-  								let arg_ty, result_ty = Specification.st_to_pair fun_ty in
-  								let _ = assert (Type.equal result_ty desired_type) in
-  								match arg_ty with
-  								| Type.Tuple ts -> ts
-  								| _ -> [arg_ty]
-  							in
-  							let _ = assert ((List.length args) = (List.length arg_tys)) in
-      					List.fold_left (fun vsa (arg, arg_ty) ->
-      						let desired_sig' =
-  									BatList.mapi (fun i v -> if i = pt then arg else v) 
-  										(BatList.make (List.length desired_sig) WildcardV)
-        						(* arg :: (BatList.make ((List.length desired_sig) - 1) WildcardV) *)
-        					in
-      						let vsa_for_arg =
-      							learn (available_depth - 1) available_uncons [pt] spec (desired_sig', arg_ty)
-      								(ty_to_exprs, ty_to_sigs, sig_to_expr)
-      						in
-    							if vsa_for_arg = Empty then raise LearnFailure
-    							else Join (App (Wildcard, Wildcard), [vsa; vsa_for_arg])
-      					) fun_vsa (List.combine args arg_tys)
-    					in
-  						let _ = my_prerr_endline (Printf.sprintf "total_vsa: %s" (string_of_vsa vsa)) in
-    					BatSet.add vsa vsas
-  					with LearnFailure -> vsas
-  				) BatSet.empty funcv_args_list
-				in
-				if (BatSet.is_empty vsas) then Empty 
-				else Union vsas
-		) pts *)
-	in
-	(* let vsa_lib = intersect_vsa_list vsas_lib in *)
-	BatSet.union result_rec result_lib *)
 
 let update_heap available_depth candidate_info heap spec (desired_sig, desired_type) (ty_to_exprs, ty_to_sigs, sig_to_expr) =
 	let inputs = List.map fst spec.spec in
