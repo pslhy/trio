@@ -527,9 +527,6 @@ let synthesis spec =
 			let exprs' = BatSet.filter (fun e -> not (is_recursive e)) exprs in 
 			BatMap.add desired_ty exprs' ty_to_exprs
 		in
-		if depth < !Options.init_trace_comp_size then
-			iter (depth+1) (ty_to_exprs, ty_to_sigs, sig_to_expr)
-		else
 		(* construct library *)
 		(* TODO: avoid  repeat unnecessary computations *)
 		let _ = 

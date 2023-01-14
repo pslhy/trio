@@ -1,2 +1,2 @@
 (library
- (name trace_synth))
+ (name trio))

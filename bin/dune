@@ -1,7 +1,7 @@
 (menhir (modules parser))
 (ocamllex lexer)
 (executable
- (public_name trace_synth)
+ (public_name trio)
  (name main)
  (modes exe)
  (preprocess (pps ppx_deriving.std ppx_compare))
