@@ -1,0 +1,16 @@
+type nat =
+  | O
+  | S of nat
+
+synth nat -> nat -> nat satisfying
+
+equiv
+
+fix (f : nat -> nat -> nat) =
+    fun (n1 : nat) ->
+      fun (n2 : nat) ->
+        match n1 with
+        | O -> O
+        | S n1p -> match n2 with
+                    | O -> n1
+                    | S n2p -> (f n1p n2p)

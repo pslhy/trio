@@ -1,0 +1,46 @@
+type nat =
+  | O
+  | S of nat
+
+type cmp =
+  | LT
+  | EQ
+  | GT
+
+type tree =
+  | Leaf
+  | Node of nat * tree * tree
+
+let compare =
+  fix (compare : nat -> nat -> cmp) =
+    fun (x1 : nat) ->
+      fun (x2 : nat) ->
+        match x1 with
+        | O -> (match x2 with
+                | O -> EQ
+                | S _ -> LT)
+        | S x1 -> (match x2 with
+                | O -> GT
+                | S x2 -> compare x1 x2)
+;;
+
+let max =
+  fix (max : nat -> nat -> nat) =
+    fun (x:nat) ->
+     fun (y:nat) ->
+      match (compare x y) with
+        | LT _ -> x
+        | EQ _ -> x
+        | GT _ -> y
+;;
+
+synth tree -> nat satisfying
+
+equiv
+
+fix (f : tree -> nat) =
+    fun (x : tree) ->
+        match x with
+        | Leaf _ -> O
+        | Node y -> S (max (f (y.1)) (f (y.2)))
+               
