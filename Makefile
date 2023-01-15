@@ -8,5 +8,5 @@ clean:
 
 .PHONY: deps
 deps:
-	opam install menhir batteries dune 
+	opam install menhir batteries dune ppx_deriving ppx_compare 
 
