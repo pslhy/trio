@@ -4,6 +4,12 @@ open Vocab
 open BidirectionalUtils
 open Generator
 
+(* This file is for computing block expressions and inverse maps. 
+   In the submitted version, we use term "trace" instead of blocks. 
+	 The term has been changed at the request of the reviewers 
+	 but the term "trace" is still used in the code. *)
+	 
+
 (* (int list (points) * signature) -> vsa * depth *)
 let learn_cache : (int list * signature, (vsa * int)) BatMap.t ref = ref BatMap.empty
 let now_learning = ref BatSet.empty 
@@ -11,6 +17,7 @@ let now_learning = ref BatSet.empty
 (* library: value -> (closure * fun_type * (arg value list)) list) *)
 let library : (value, (value * Type.t * value list) list) BatMap.t ref = ref BatMap.empty 
 	
+(* corresponds to BlockGen in Fig. 4 *)
 (* pts : indices of IO-examples which should be satisfied *)
 let rec learn available_depth pts spec (desired_sig, desired_type) 
 				(ty_to_exprs, ty_to_sigs, sig_to_expr) = 
@@ -22,7 +29,7 @@ let rec learn available_depth pts spec (desired_sig, desired_type)
 	let _ = assert (not (BatList.is_empty desired_sig_pts)) in
 	(* already consumed available_depth *)
 	if (available_depth <= 0) then Empty
-	(* to avoid revisit the same synthesis problem *)
+	(* to avoid revisiting the same synthesis problem being solved *)
 	else if (BatSet.mem key !now_learning) then Empty
 	(* already solved it before and the solution is in the cache *)
 	else if ( (BatMap.mem key !learn_cache) &&
@@ -45,7 +52,7 @@ let rec learn available_depth pts spec (desired_sig, desired_type)
 		in
 		let result = 
 			let vsas = 
-				(* collect components that can solve the problem *)
+				(* compute simple blocks -- SimpleBlocks in Fig. 4 *)
   			BatSet.fold (fun sg acc -> 
   				let expr = try (BatMap.find sg sig_to_expr) with _ -> assert false in 
 					let _ = 
@@ -54,8 +61,7 @@ let rec learn available_depth pts spec (desired_sig, desired_type)
 					BatSet.add (Direct expr) acc
   			) sigs BatSet.empty  
 			in
-			(* to collect traces as many as possible, we continue searching *)
-			(* 다른 rule 들 사용한 결과 추가 *)
+			(* additionally compute compound blocks -- CompoundBlocks in Fig. 4*)
 			let vsas = 
 				List.fold_left (fun vsas learn_func ->
 					let vsa = 
@@ -68,19 +74,20 @@ let rec learn available_depth pts spec (desired_sig, desired_type)
 			if (BatSet.is_empty vsas) then Empty 
 			else vsa_of_vsas vsas
 		in
+		(* add it to the cache *)
 		let _ = 
 			learn_cache := BatMap.add key (result, available_depth) !learn_cache;
 			now_learning := BatSet.remove key !now_learning 
 		in 
 		result 	  
 		
+(* B_CTOR in Fig. 4 *)		
 and learn_ctor available_depth pts spec (desired_sig, _) 
 		(ty_to_exprs, ty_to_sigs, sig_to_expr) = 
 	let desired_sig_pts = (elems_of_indices pts desired_sig) in
 	let _ = my_prerr_endline (Printf.sprintf "learn_ctor [%d]: %s" available_depth (string_of_signature desired_sig_pts)) in 
 	let _ = assert (not (BatList.is_empty desired_sig_pts)) in 
-	(* 1. type check : desired output 이 모두 동일한 constructor 꼴인지 (C(v11,v12), .., C(vk1,vk2)) *)
-	(* check if all subgoals are in form of constructor expressions *)
+	(* desired output should be of form (C(v11,v12), .., C(vk1,vk2)) for some constructor C *)
 	if (List.for_all (fun v -> is_ctor_value v) desired_sig_pts) then
 		let constructors = 
 			List.map (fun v -> match v with CtorV (i, _) -> i | _ -> assert false) desired_sig_pts
@@ -113,6 +120,7 @@ and learn_ctor available_depth pts spec (desired_sig, _)
 			Empty 
 	else Empty 		
 
+(* B_DTOR in Fig. 4 *)		
 (* C^-1 ( ?? ) = [v1, ... , vn] : desired_type *)
 (* ?? => [C(v1), ..., C(vn)]  *)
 and learn_unctor available_depth pts spec (desired_sig, desired_type) 
@@ -152,7 +160,7 @@ and learn_unctor available_depth pts spec (desired_sig, desired_type)
 	if BatSet.is_empty vsas then Empty
 	else Union vsas 
 		 
-
+(* B_TUPLE in Fig. 4 *)
 and learn_tuple available_depth pts spec (desired_sig, desired_type) 
 		(ty_to_exprs, ty_to_sigs, sig_to_expr) = 
 		(* desired output: TupleV(v11, v12), ... TupleV(vk1, vk2) *)
@@ -171,6 +179,7 @@ and learn_tuple available_depth pts spec (desired_sig, desired_type)
 				) desired_sig_pts	|> list2set 
 			in
 			let _ = 
+				(* some expr evaluates to tuples of different lengths -- should be impossible *)
 				if ((BatSet.cardinal tuple_lens) <> 1) then 
 					let _ = prerr_endline (string_of_list show_value desired_sig) in
 					let _ = prerr_endline (string_of_list string_of_int pts) in
@@ -179,16 +188,17 @@ and learn_tuple available_depth pts spec (desired_sig, desired_type)
 			in
 			let tuple_len = BatSet.choose tuple_lens in
 			try
+				(* empty tuple *)
 				let _ = if tuple_len = 0 then raise LearnFailure in 
   			let arg_vsa_list =
   				List.map (fun i ->
   					let desired_sig' =  
       				BatList.mapi (fun i' v ->
-  							if List.mem i' pts then 
+  							if List.mem i' pts then (* i'-th output example should be satisfied *)
         					match v with 
-        					| TupleV vs -> List.nth vs i 
+        					| TupleV vs -> List.nth vs i (* i-th element of the tuple is the desired output *)
         					| _ -> assert false
-  							else v    
+  							else v  (* don't care -- any value is fine *)
       				) desired_sig
     				in
   					let desired_type' = List.nth (Type.destruct_tuple desired_type) i in 
@@ -205,8 +215,9 @@ and learn_tuple available_depth pts spec (desired_sig, desired_type)
 			with LearnFailure -> Empty 
 		else Empty 
 
-and learn_proj available_depth pts spec (desired_sig, desired_type) 
-	(ty_to_exprs, ty_to_sigs, sig_to_expr) =
+(* B_PROJ in Fig. 4 *)		
+and learn_proj available_depth pts _ (desired_sig, _) 
+	(_, _, sig_to_expr) =
 	let desired_sig_pts = (elems_of_indices pts desired_sig) in
 	let _ = my_prerr_endline (Printf.sprintf "learn_proj [%d]: %s" available_depth (string_of_signature desired_sig_pts)) in
 	(* desired output: v1, ..., vk *)
@@ -258,6 +269,7 @@ and learn_proj available_depth pts spec (desired_sig, desired_type)
 	if BatSet.is_empty vsas then Empty
 	else Union vsas 
 
+(* B_APP in Fig. 4 *)
 (* learn app : learn VSAs via fuzzing over user-defined functions 
 	 target function is not considered *)
 (* library: value (output) -> (value (closure) * (value list) (args)) list) *)
@@ -327,48 +339,40 @@ and learn_app available_depth pts spec (desired_sig, desired_type)
 and learn_funcs = [learn_ctor; learn_unctor; learn_tuple; learn_proj; learn_app]
 
 
+(* Section 4.2 Getting Inverse Maps of External Functions by Library Sampling *)
 (* library: value (output) -> (closure * type * (value list)) list  (closure, type, arg values) *)
 let compute_library spec ty_to_sigs =
 	(* size of the largest input value *)
 	let inputs : value list = List.map fst spec.spec in 
 	let outputs : value list = List.map snd spec.spec in 
-	let max_height = 
-		List.fold_left (fun max_height input ->
-			let height = 
-				match input with 
-				|	TupleV vs -> 
-					BatList.max (List.map (fun v -> height_of_expr (exp_of_value v)) vs) 
-				| _ -> height_of_expr (exp_of_value input)
-			in
-			if max_height < height then height else max_height
-		) 0 inputs   
-	in
-	(* let max_height = ceil ((log (float_of_int max_size)) /. (log 2.0)) |> int_of_float in    *)
-	(* let max_height = min max_height !Options.max_height in  *)
-	let _ = my_prerr_endline (Printf.sprintf "max height for fuzzing: %d" max_height) in
-	(* collect all user-provided functions and their types *)
+	(* collect all user-provided functions and their types 
+		 ty_to_sigs contains evaluation results of component expressions *)
 	let func_definitions : (value * Type.t) BatSet.t (* closure, type *) =
 		BatMap.foldi (fun ty sigs acc ->
 			if Type.is_arrow_type ty then
 				BatSet.fold (fun sg acc ->
+					(* expression involving target function: signature comprises top values 
+						 [[ f ]](i1, ..., in) = [T, ..., T] *)
 					if (is_top_signature sg) then acc 
 					else 
   					List.fold_left (fun acc v ->
 							if (is_func_value v) then 
   							BatSet.add (v, ty) acc
-							else (* expression involving target function -> signature comprises top values *)
+							else (* not a function closure *)
 								acc	 
   					) acc sg 
 				) sigs acc        
 			else acc   
 		) ty_to_sigs BatSet.empty 
 	in
-	(* collect constants *)
-
+	(* collect inputs for library sampling 
+		 use all sub-structures of values that appear in I/O examples 
+		 e.g., from S(S(S(O))) (i.e., 3), get S(S(S(O))), S(S(O)), S(O), O (i.e., 3, 2, 1, 0) 
+		 and use them as inputs for library function sampling *)
 	let ty_to_exprs = 
 		let rec get_all_subexpr_in_value v = 
 			match v with 
-			| CtorV (i, v') -> 
+			| CtorV (_, v') -> 
 				BatSet.add (exp_of_value v) (get_all_subexpr_in_value v')
   		| TupleV vs -> 
 				List.fold_left (fun acc v ->
@@ -387,22 +391,22 @@ let compute_library spec ty_to_sigs =
 			BatMap.add ty (BatSet.add expr exprs) ty_to_exprs
 		) exprs BatMap.empty 
 	in 
-
-	(* let (*(ty_to_exprs, _, _)*)ty_to_exprs = 
-		BatMap.foldi (fun ty sigs ty_to_exprs -> 
-			BatSet.fold (fun sg ty_to_exprs -> 
-				let exprs = try BatMap.find ty ty_to_exprs with _ -> BatSet.empty in 
-				let exprs' =
-					List.fold_left (fun acc v -> 
-						if is_bot_value v then acc 
-						else BatSet.add (exp_of_value v) acc
-					) exprs sg
-				in
-				BatMap.add ty exprs' ty_to_exprs
-			) sigs ty_to_exprs 
-		) ty_to_sigs BatMap.empty 
-
-		(* let rec fix depth (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
+	(* another method for getting inputs for library sampling 
+		 construct values of height <= max_height of values that appear in I/O examples 
+		 we do not use this method for an efficiency issue but we leave this on record *)
+	(* let max_height = 
+		List.fold_left (fun max_height input ->
+			let height = 
+				match input with 
+				|	TupleV vs -> 
+					BatList.max (List.map (fun v -> height_of_expr (exp_of_value v)) vs) 
+				| _ -> height_of_expr (exp_of_value input)
+			in
+			if max_height < height then height else max_height
+		) 0 inputs   
+	in
+	let (ty_to_exprs,_,_) =
+		let rec fix depth (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
 			let (ty_to_exprs', ty_to_sigs', sig_to_expr') = 
 				get_components_of_depth ~grow_funcs:[grow_ctor; grow_tuple] spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)
 			in
@@ -410,31 +414,10 @@ let compute_library spec ty_to_sigs =
 				(ty_to_exprs, ty_to_sigs, sig_to_expr)
 			else fix (depth + 1) (ty_to_exprs', ty_to_sigs', sig_to_expr')
 		in
-		fix 2 (BatMap.add Type._unit (BatSet.singleton unit_) BatMap.empty, BatMap.empty, BatMap.empty) *)
+		fix 2 (BatMap.add Type._unit (BatSet.singleton unit_) BatMap.empty, BatMap.empty, BatMap.empty)
 	in *)
-
-
-	(* let (ty_to_exprs,_,_) =
-		let (ty_to_exprs, ty_to_sigs, sig_to_expr) =
-  		(BatMap.add Type._unit (BatSet.singleton unit_) BatMap.empty,
-  		 BatMap.empty, 
-  		 BatMap.empty)    
-  	in
-		let rec iter target_height (ty_to_exprs, ty_to_sigs, sig_to_expr) =
-  		if (target_height > max_height) then (ty_to_exprs, ty_to_sigs, sig_to_expr) 
-  		else 
-				let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
-  				grow_ctor [] spec (ty_to_exprs, ty_to_sigs, sig_to_expr)
-				in
-				let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
-  				grow_tuple [] spec (ty_to_exprs, ty_to_sigs, sig_to_expr)
-				in
-				iter (target_height + 1) (ty_to_exprs, ty_to_sigs, sig_to_expr)
-  	in  
-		iter 1 (ty_to_exprs, ty_to_sigs, sig_to_expr) 
-	in  *)
-	let _ = my_prerr_endline (string_of_map Type.show (fun s -> string_of_set Expr.show s) ty_to_exprs) in  
-	(* call the funcs with the constants as arguments *)
+	
+	(* call the function closures with the collected inputs as arguments *)
 	BatSet.fold (fun (funv, ty) lib ->
 		let _ = assert (Type.is_arrow_type ty) in
 		(* t1 -> t2 -> ... -> tn  => (t1 * t2 * ... * tn-1), tn 
@@ -469,7 +452,7 @@ let compute_library spec ty_to_sigs =
 				try evaluate call_exp with _ -> Bot  
 			) arg_exprs_list 
 		in 
-		(* library[v |-> (f, [v1, v2, v3])] *) 
+		(* add v |-> (f, [v1, .., vn]) into the inverse map for each f(v1, .., vn) = v *) 
 		List.fold_left2 (fun lib result_value arg_values ->
 			let bindings = try BatMap.find result_value lib with _ -> [] in
 			let _ =
@@ -484,77 +467,3 @@ let init () =
 	let _ = learn_cache := BatMap.empty in
 	let _ = now_learning := BatSet.empty in 
 	()
-
-
-(** Main DUET algorithm *)						
-let synthesis spec =
-	let input_values = List.map fst spec.spec in
-	let desired_sig = List.map snd spec.spec in
-	let desired_ty = snd spec.synth_type in 
-	let ty_to_exprs = BatMap.empty in
-	let ty_to_sigs = BatMap.empty in 
-	let sig_to_expr = BatMap.empty in
-	(* collect exprs that can be used as a variable in a match expression 
-		 results are without recursive components *)
-	let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
-		let rec fix depth (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
-			let (ty_to_exprs', ty_to_sigs', sig_to_expr') = 
-				get_components_of_depth ~grow_funcs:[grow_unctor; grow_proj] spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)
-			in
-			if (BatMap.compare BatSet.compare ty_to_exprs' ty_to_exprs) = 0 then 
-				(ty_to_exprs, ty_to_sigs, sig_to_expr)
-			else fix (depth + 1) (ty_to_exprs', ty_to_sigs', sig_to_expr')
-		in
-		fix 1 (ty_to_exprs, ty_to_sigs, sig_to_expr)
-	in
-	let _ = 
-		let exprs = BatMap.foldi (fun _ exprs acc -> BatSet.union exprs acc) ty_to_exprs BatSet.empty in   
-		my_prerr_endline (Printf.sprintf "initial components: %s" (string_of_set Expr.show exprs))
-	in
-	let rec iter depth (ty_to_exprs, ty_to_sigs, sig_to_expr) =
-		(* clean up caches *)
-		let _ = init () in
-		let _ = 
-			if depth > !Options.max_height then 
-				failwith (Printf.sprintf "No solution within depth of %d." !Options.max_height) 
-		in
-		let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
-			get_components_of_depth spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (depth, depth + 1)
-		in
-		(* remove recursive components *)
-		let ty_to_exprs = 
-			let exprs = try BatMap.find desired_ty ty_to_exprs with _ -> BatSet.empty in 
-			let exprs' = BatSet.filter (fun e -> not (is_recursive e)) exprs in 
-			BatMap.add desired_ty exprs' ty_to_exprs
-		in
-		(* construct library *)
-		(* TODO: avoid  repeat unnecessary computations *)
-		let _ = 
-			library := compute_library spec ty_to_sigs
-		in	
-		let _ =
-			let exprs = BatMap.foldi (fun _ exprs acc -> BatSet.union exprs acc) ty_to_exprs BatSet.empty in   
-			my_prerr_endline (Printf.sprintf "====== iter : %d ======" depth);
-			my_prerr_endline (Printf.sprintf "# components: %d" (BatSet.cardinal exprs));
-			my_prerr_endline (Printf.sprintf "components: %s" (string_of_set Expr.show exprs)); 
-		in 
-		let vsas =
-			BatList.mapi (fun i _ ->
-				let pts = [i] in 
-				learn !Options.max_height pts spec (desired_sig, desired_ty) (ty_to_exprs, ty_to_sigs, sig_to_expr)					 
-			) input_values  
-		in
-		if BatList.for_all (fun vsa -> vsa <> Empty) vsas then 
-			let _ = prerr_endline "trace exprs learned" in
-			if !Options.print_traces then 
-				BatList.iteri (fun i vsa ->
-					let exprs = set_of_vsa vsa in
-					BatSet.iter (fun e ->
-						prerr_endline (Printf.sprintf "%s [%d]" (Expr.show (normalize e)) i)
-					) exprs
-				) vsas;
-			vsas
-		else
-			iter (depth + 1) (ty_to_exprs, ty_to_sigs, sig_to_expr) 
-	in
-	iter 1 (ty_to_exprs, ty_to_sigs, sig_to_expr)

@@ -32,7 +32,7 @@ type t = {
   spec         : (value * value) list ; (* inputs (in a tuple) and output *)
 }
 
-let rec show t = 
+let show t = 
 	let id x = x in 
 	Printf.sprintf "synth_type: %s -> %s\n ec: %s\n tc: %s\n td: %s\n vc: %s\n spec: %s\n"
 		(Type.show (fst t.synth_type)) (Type.show (snd t.synth_type))
@@ -64,7 +64,7 @@ let rec extract_variants (t:Type.t)
     | Arrow (t1, t2) -> (extract_variants t1) @ (extract_variants t2)
     | Tuple tys -> List.fold_left (fun vs ty -> vs @ (extract_variants ty)) [] tys  
     | Variant vs -> 
-			List.fold_left (fun vs (id, ty) -> vs @ (extract_variants ty)) vs vs
+			List.fold_left (fun vs (_, ty) -> vs @ (extract_variants ty)) vs vs
 			(* vs *)
 			  
 		
@@ -90,7 +90,7 @@ let process_decl_list (decls:declaration list)
 		) init_ctxs decls
 				
 				
-let process_spec (ec, tc, td, vc) (uspec:unprocessed_spec) : spec = 
+let process_spec (ec, _, _, _) (uspec:unprocessed_spec) : spec = 
 	match uspec with 
 	| UIOEs us ->
 		(* TODO : typecheck examples *)
@@ -107,7 +107,7 @@ let process_spec (ec, tc, td, vc) (uspec:unprocessed_spec) : spec =
     examples		
 				
 				
-let rec process (unprocessed : t_unprocessed) : t =
+let process (unprocessed : t_unprocessed) : t =
   let (_,decls,synth_type,uspec) = unprocessed in
 	let (ec,tc,td,vc) = process_decl_list decls in
   let synth_type = st_to_pair synth_type in

@@ -58,14 +58,14 @@ let rec typecheck_exp (ec:eval_context) (tc:type_context)
   | Var v ->
 		(try BatMap.find v tc with _ -> failwith ("variable " ^ v ^ " not found"))
   | Eq (_,e1,e2) ->
-    let t1 = typecheck_simple e1 in
-    let t2 = typecheck_simple e2 in
+    let _ = typecheck_simple e1 in
+    let _ = typecheck_simple e2 in
     (* assert (type_equiv tc t1 t2); *)
     _bool
   | App (e1,e2) ->
     let t1 = concretify td (typecheck_simple e1) in
-    let (t11,t12) = try destruct_arrow t1 with _ -> failwith ("destruct_arrow: " ^ Type.show t1) in
-    let t2 = typecheck_simple e2 in
+    let (_,t12) = try destruct_arrow t1 with _ -> failwith ("destruct_arrow: " ^ Type.show t1) in
+    let _ = typecheck_simple e2 in
     (* if type_equiv tc t11 t2 then *)
       t12
     (* else                                 *)
@@ -77,8 +77,8 @@ let rec typecheck_exp (ec:eval_context) (tc:type_context)
     let tc' = BatMap.add i t tc in
     Arrow (t, (typecheck_exp ec tc' td vc e))
   | Ctor (i,e) ->
-    let t = typecheck_simple e in
-    let arg_ty, parent_ty = try BatMap.find i vc with _ -> failwith "typecheck: ctor" in
+    let _ = typecheck_simple e in
+    let _, parent_ty = try BatMap.find i vc with _ -> failwith "typecheck: ctor" in
     (* if type_equiv tc arg_ty t then *)
 			(* Variant [(i, arg_ty)] *)
       parent_ty
@@ -94,7 +94,7 @@ let rec typecheck_exp (ec:eval_context) (tc:type_context)
         typecheck_exp ec tc td vc e
 			) branches
     in
-    let (ht,tt) = (List.hd ts, List.tl) in
+    let (ht,_) = (List.hd ts, List.tl) in
     (* assert (List.for_all ~f:(fun t -> type_equiv tc ht t) tt); *)
     ht
   | Fix (i,t,e) ->

@@ -62,12 +62,12 @@ let join_node_of_exp exp =
 	| Match (e, patterns) ->
 		let patterns_abstract = List.map (fun (p, _) -> (p, Wildcard)) patterns in  
 		Join (Match (Wildcard, patterns_abstract), (Direct e) :: List.map (fun (_, e') -> Direct e') patterns)
-	| Fix (i, ty, e) -> assert false 
+	| Fix _ -> assert false 
   | Tuple es -> Join (Tuple [], List.map (fun e -> Direct e) es)
   | Proj (i, e) -> Join (Proj(i, Wildcard), [Direct e])	
 		  
 
-let rec union_vsa vsa1 vsa2 = 
+let union_vsa vsa1 vsa2 = 
 	match vsa1, vsa2 with 
 	| Empty, _ -> vsa2
 	| _, Empty -> vsa1
@@ -87,7 +87,7 @@ let rec intersect_vsa vsa1 vsa2 =
 	| _, Empty -> Empty
 	| Direct e1, Direct e2 -> 
 		if (Expr.equal e1 e2) then Direct e1 else Empty 
-	| Direct e1, Union vsas2 -> 
+	| Direct _, Union _ -> 
 		intersect_vsa (Union (BatSet.singleton vsa1)) vsa2
 	| Direct e1, Join _ ->
 		intersect_vsa (join_node_of_exp e1) vsa2
@@ -129,14 +129,14 @@ exception LearnFailure
 exception LearnMatchFailure
 exception SubSolutionFound of Expr.t 
 
-(* sig -> expr (<= size) *)
+(* return: (ty_to_exprs, ty_to_sigs, sig_to_expr) *)
 let get_components_of_depth ?(grow_funcs=[]) spec (ty_to_exprs, ty_to_sigs, sig_to_expr) (curr_depth, max_depth) =
 	let input_values = List.map fst spec.spec in 
 	let desired_sig = List.map snd spec.spec in
 	let result_top = BatList.make (List.length desired_sig) WildcardV in 
 	let (ty_to_exprs, ty_to_sigs, sig_to_expr) = 
   	if (curr_depth = 1) then 
-  		(* 크기 1 짜리 모으기 *)
+  		(* size 1 exprs: variables and unit *)
   		let small_exprs = 
   			(Tuple []) :: (List.map (fun i -> Var i) (domof spec.tc)) 
   		in  
@@ -167,19 +167,11 @@ let get_components_of_depth ?(grow_funcs=[]) spec (ty_to_exprs, ty_to_sigs, sig_
   					let (ty_to_exprs', ty_to_sigs, sig_to_expr) = 
 							grow_func curr_depth desired_sig spec (ty_to_exprs, ty_to_sigs, sig_to_expr)
 						in
-						(* let _ = 
-							my_prerr_endline "ty_to_exprs' : ";
-							my_prerr_endline (string_of_map Type.show (string_of_set Expr.show) ty_to_exprs')
-						in  *)
 						(ty_to_exprs' :: ty_to_exprs_list, ty_to_sigs, sig_to_expr)
   				) ([], ty_to_sigs, sig_to_expr) grow_funcs
 				in
 				(merge_maps BatSet.empty BatSet.union ty_to_exprs_list, ty_to_sigs, sig_to_expr)
   		in
-			(* let _ = 
-				my_prerr_endline "merged : ";
-				my_prerr_endline (string_of_map Type.show (string_of_set Expr.show) ty_to_exprs)
-			in  *)
 			iter (depth + 1) (ty_to_exprs, ty_to_sigs, sig_to_expr)
 	in
 	iter curr_depth (ty_to_exprs, ty_to_sigs, sig_to_expr)
@@ -195,7 +187,7 @@ let rec string_of_vsa vsa =
 
 let rec pgm_count_of_vsa vsa =
 	match vsa with 
-	| Direct expr -> 1
+	| Direct _ -> 1
 	| Join (_, vsa_list) ->
 		let sizes = BatList.map pgm_count_of_vsa vsa_list in 
 		List.fold_left ( * ) 1 sizes   
@@ -229,7 +221,8 @@ let rec choose_best_from_vsa vsa =
 		let vsa_list = BatSet.elements vsa_set in 
 		let vsa_list_with_size = List.map (fun vsa -> (pgm_size_of_vsa vsa, vsa)) vsa_list in 
 		let vsa_list_with_size = 
-			List.sort (fun ((lb1, ub1), vsa1) ((lb2, ub2), vsa2) -> lb1 - lb2) vsa_list_with_size
+			(* pick the VSA containing the smallest expr *)
+			List.sort (fun ((lb1, _), _) ((lb2, _), _) -> lb1 - lb2) vsa_list_with_size
 		in 
 		BatList.hd vsa_list_with_size |> snd |> choose_best_from_vsa   
 	| Join (ekind, vsa_list) ->
@@ -255,7 +248,7 @@ let rec choose_low_cost_from_vsa vsa =
     let vsa_list = BatSet.elements vsa_set in 
     let vsa_list_with_cost = List.map (fun vsa -> (pgm_cost_of_vsa vsa, vsa)) vsa_list in 
     let vsa_list_with_cost = 
-      List.sort (fun (c1, vsa1) (c2, vsa2) -> c1 - c2) vsa_list_with_cost
+      List.sort (fun (c1, _) (c2, _) -> c1 - c2) vsa_list_with_cost
     in 
     BatList.hd vsa_list_with_cost |> snd |> choose_low_cost_from_vsa   
   | Join (ekind, vsa_list) ->

@@ -1,5 +1,4 @@
 open Options
-open Vocab
 
 let main () = 
     let src = ref "" in

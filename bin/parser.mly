@@ -1,6 +1,5 @@
 %{
 open Expr
-open Vocab
 
 let rec appify (e:Expr.t) (es:Expr.t list) : Expr.t =
   match es with

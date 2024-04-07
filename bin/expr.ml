@@ -134,11 +134,11 @@ let rec count_recursions e =
 	| Unctor (_, e) -> (count_recursions e)
 	| Eq (_, e1, e2) -> (count_recursions e1) + (count_recursions e2)
 	| Match (e, patterns) -> 
-		List.fold_left (fun acc (_, e) -> acc + (count_recursions e)) 0 patterns 
+		List.fold_left (fun acc (_, e) -> acc + (count_recursions e)) (count_recursions e) patterns 
 	| Fix (_, _, e) -> (count_recursions e)
 	| Tuple es -> List.fold_left (fun acc e -> acc + (count_recursions e)) 0 es
 	| Proj (_, e) -> (count_recursions e) 
-	| _ -> 0 	
+	| Wildcard -> 0
 
 
 let rec cost_of_expr_with_input ?(in_list=[2.5;6.1;1.4;2.2;8.8;1.3;1.3;3.8;4.5;6.2;6.5;4.0]) e =
@@ -147,12 +147,12 @@ let rec cost_of_expr_with_input ?(in_list=[2.5;6.1;1.4;2.2;8.8;1.3;1.3;3.8;4.5;6
 	| Wildcard -> (List.nth in_list 1)
 	| App (e1, e2) -> if (count_recursions e) < 1 then (cost_of_expr_with_input e1 ~in_list:in_list) +. (cost_of_expr_with_input e2 ~in_list:in_list) +. (List.nth in_list 2)
 										else (cost_of_expr_with_input e1 ~in_list:in_list) +. (cost_of_expr_with_input e2 ~in_list:in_list) +. (List.nth in_list 3)
-	| Func (p, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 4)
-	| Ctor (i, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 5)
-	| Unctor (i, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 6)
-	| Eq (b, e1, e2) -> (cost_of_expr_with_input e1 ~in_list:in_list) +. (cost_of_expr_with_input e2 ~in_list:in_list) +. (List.nth in_list 7)
-	| Match (e', patterns) ->
-		List.fold_left (fun acc (pat, e') -> acc +. (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 8)) 0. patterns
+	| Func (_, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 4)
+	| Ctor (_, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 5)
+	| Unctor (_, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 6)
+	| Eq (_, e1, e2) -> (cost_of_expr_with_input e1 ~in_list:in_list) +. (cost_of_expr_with_input e2 ~in_list:in_list) +. (List.nth in_list 7)
+	| Match (_, patterns) ->
+		List.fold_left (fun acc (_, e') -> acc +. (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 8)) 0. patterns
 	| Fix (_, _, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 9)
 	| Tuple es -> List.fold_left (fun acc e' -> acc +. (cost_of_expr_with_input e' ~in_list:in_list)) (List.nth in_list 10) es
 	| Proj (_, e') -> (cost_of_expr_with_input e' ~in_list:in_list) +. (List.nth in_list 11)
@@ -164,12 +164,12 @@ let rec cost_of_expr e =
   | Wildcard -> 100
   | App (e1, e2) -> if (count_recursions e) < 1 then (cost_of_expr e1) + (cost_of_expr e2) + 2
 										else (cost_of_expr e1) + (cost_of_expr e2) + 1
-  | Func (p, e') -> (cost_of_expr e')
-  | Ctor (i, e') -> (cost_of_expr e') + 1
-  | Unctor (i, e') -> (cost_of_expr e')
-  | Eq (b, e1, e2) -> (cost_of_expr e1) + (cost_of_expr e2) + 1
+  | Func (_, e') -> (cost_of_expr e')
+  | Ctor (_, e') -> (cost_of_expr e') + 1
+  | Unctor (_, e') -> (cost_of_expr e')
+  | Eq (_, e1, e2) -> (cost_of_expr e1) + (cost_of_expr e2) + 1
   | Match (e', patterns) ->
-    List.fold_left (fun acc (pat, e') -> acc + (cost_of_expr e') + 1) ((cost_of_expr e') + 1000) patterns
+    List.fold_left (fun acc (_, e') -> acc + (cost_of_expr e') + 1) ((cost_of_expr e') + 1000) patterns
   | Fix (_, _, e') -> (cost_of_expr e')
   | Tuple es -> 
 		if BatList.is_empty es then 10
@@ -179,7 +179,7 @@ let rec cost_of_expr e =
 			 
 let ekind_of_expr expr = 
 	match expr with 
-	| Var _ -> Var ""
+	| Var i -> Var i
 	| Wildcard -> Wildcard
 	| App _ -> App (Wildcard, Wildcard)
 	| Func (p, _) -> Func (p, Wildcard)
@@ -190,7 +190,7 @@ let ekind_of_expr expr =
 		let patterns' = List.map (fun (pat, _) -> (pat, Wildcard)) patterns in
 		Match (e', patterns')
 	| Fix (i, t, _) -> Fix (i, t, Wildcard)
-	| Tuple es -> Tuple []
+	| Tuple _ -> Tuple []
 	| Proj (i, _) -> Proj (i, Wildcard)	
 
 let children_of_expr expr = 
@@ -230,23 +230,12 @@ let rec get_expr_from_addr expr addr =
 		in
 		get_expr_from_addr expr' (BatList.tl addr)
 
-(* 
-		let children = children_of_expr expr in 
-		if BatList.is_empty children then 
-			failwith (Printf.sprintf "get_expr_from_addr: no children of expr %s at addr %s" (show expr) (string_of_list string_of_int addr))
-		else 
-			let child = 
-				try 
-					BatList.nth children (BatList.hd addr) 
-				with _ -> failwith (Printf.sprintf "get_expr_from_addr: failed to get %d-th child of %s" (BatList.hd addr) (string_of_list show children))
-			in
-			get_expr_from_addr child (BatList.tl addr) *)
 
 let construct_from_ekind_and_argexprs ekind es =
 	match ekind with 
-	| Var _ | Wildcard ->
-		let _ = assert ((List.length es) = 1) in
-		List.hd es
+	| Var _ | Wildcard -> ekind
+		(* let _ = assert ((List.length es) = 1) in
+		List.hd es *)
 	| App _ -> 
 		let _ = assert ((List.length es) = 2) in
 		App (List.nth es 0, List.nth es 1) 	
@@ -262,9 +251,10 @@ let construct_from_ekind_and_argexprs ekind es =
 	| Eq (b, _, _) -> 
 		let _ = assert ((List.length es) = 2) in
 		Eq (b, List.nth es 0, List.nth es 1)
-	| Match (_, patterns) ->
-		let _ = assert ((List.length es) = (List.length patterns) + 1) in
-		Match (List.hd es, List.map2 (fun (pat, _) e' -> (pat, e')) patterns (List.tl es))   	
+	| Match (e, patterns) ->
+		(* let _ = assert ((List.length es) = (List.length patterns) + 1) in *)
+		(* Match (List.hd es, List.map2 (fun (pat, _) e' -> (pat, e')) patterns (List.tl es))   	 *)
+		Match (e, List.map2 (fun (pat, _) e' -> (pat, e')) patterns es)   	
 	| Fix (i, t, _) -> 
 		let _ = assert ((List.length es) = 1) in
 		Fix (i, t, List.hd es)
@@ -365,7 +355,6 @@ let rec leq_value v1 v2 =
     			List.for_all (fun v1 -> List.exists (leq_value v1) v2s) v1s
   		| _ -> false  
 	in
-	(* prerr_endline (Printf.sprintf "%s %s %s" (show_value v1) (if result then "<=" else ">") (show_value v2)); *)
 	result 
 		
 let lt_value v1 v2 = 
@@ -457,12 +446,11 @@ let rec contains_id i e =
   | Ctor (_, e) -> (contains_id i e)
   | Unctor (_, e) -> (contains_id i e)
   | Eq (_, e1, e2) -> (contains_id i e1) || (contains_id i e2)
-  | Match (e, patterns) -> 
+  | Match (_, patterns) -> 
 		List.fold_left (fun acc (_, e) -> acc || (contains_id i e)) false patterns 
   | Fix (i', _, e) -> (String.equal i i') || (contains_id i e)
   | Tuple es -> 
 		(not (BatList.is_empty es)) && (List.for_all (contains_id i) es) 
-		(* List.fold_left (fun acc e -> acc || (contains_id i e)) false es *)
   | Proj (_, e) -> (contains_id i e) 
 	| _ -> false  
 	
@@ -485,7 +473,7 @@ let rec get_pattern_match_vars e =
 		List.fold_left (fun acc (_, e') -> 
 			BatSet.union acc (get_pattern_match_vars e')
 		) (get_pattern_match_vars e') patterns 
-  | Fix (i', _, e') -> get_pattern_match_vars e'
+  | Fix (_, _, e') -> get_pattern_match_vars e'
   | Tuple es -> 
 		List.fold_left (fun acc e' -> 
 			BatSet.union acc (get_pattern_match_vars e')
@@ -497,7 +485,7 @@ let rec get_pattern_match_vars e =
 	| _ -> BatSet.empty   
 	
 
-let rec is_recursive e = 
+let is_recursive e = 
 	(count_recursions e) > 0 
 
 let rec get_scrutinees e = 
@@ -514,10 +502,6 @@ let rec get_recursive_calls e =
 		BatSet.singleton e 
 	| App (e1, e2) -> 
 		BatSet.union (get_recursive_calls e1) (get_recursive_calls e2)  
-		(* if (contains_id target_func e1) then 
-			BatSet.add e (get_recursive_calls e2) 
-		else 
-			(get_recursive_calls e2)  *)
   | Func (_, e) -> get_recursive_calls e
   | Ctor (_, e) -> get_recursive_calls e
   | Unctor (_, e) -> get_recursive_calls e
@@ -536,7 +520,7 @@ let rec get_constructors e =
   | Ctor (_, e') -> BatSet.add e (get_constructors e')
   | Unctor (_, e) -> get_constructors e
   | Eq (_, e1, e2) -> BatSet.union (get_constructors e1) (get_constructors e2)
-  | Match (e, patterns) -> 
+  | Match (_, patterns) -> 
 		List.fold_left (fun acc (_, e) -> BatSet.union acc (get_constructors e)) BatSet.empty patterns 
   | Fix (_, _, e) -> (get_constructors e)
   | Tuple es -> List.fold_left (fun acc e -> BatSet.union acc (get_constructors e)) BatSet.empty es
@@ -550,7 +534,7 @@ let rec get_unconstructors e =
   | Ctor (_, e) -> get_unconstructors e
   | Unctor (_, e') -> BatSet.add e (get_unconstructors e')
   | Eq (_, e1, e2) -> BatSet.union (get_unconstructors e1) (get_unconstructors e2)
-  | Match (e, patterns) -> 
+  | Match (_, patterns) -> 
 		List.fold_left (fun acc (_, e) -> BatSet.union acc (get_unconstructors e)) BatSet.empty patterns 
   | Fix (_, _, e) -> (get_unconstructors e)
   | Tuple es -> List.fold_left (fun acc e -> BatSet.union acc (get_unconstructors e)) BatSet.empty es
@@ -575,20 +559,11 @@ let rec get_args e =
   | Proj (_, e) -> (get_args e)
 	| _ -> BatSet.singleton e
 		
-(* let get_args e =                                                       *)
-(* 	let rec get_args_internal e =                                        *)
-(* 		match e with                                                       *)
-(*   	| App (Var _, e2) -> e2 :: (get_args_internal e2)                  *)
-(* 		| App (e1, e2) -> (get_args_internal e1) @ (get_args_internal e2)  *)
-(*   	| _ -> [e]                                                         *)
-(* 	in                                                                   *)
-(* 	match e with                                                         *)
-(* 	| App _ -> get_args_internal e                                       *)
-(* 	| _ -> []                                                            *)
 		
 let value_of_bool b = 
 	if b then truev_ else falsev_
 
+(* constructor / destructor simplification (Section 5.4)*)
 let rec normalize e =
 	match e with 
 	| Ctor (i1, Unctor (i2, e')) -> 
@@ -677,7 +652,6 @@ let rec replace_expr (e_src:t) (e_dst:t) (e:t) : t =
 			| _ -> e
 		end
 	in
-	(* let _ = my_prerr_endline ("replace_expr: " ^ show e_src ^ " -> " ^ show e_dst ^ " in " ^ show e ^ " = " ^ show result) in *)
 	result
 
 let rec matches_pattern_and_extractions (p:Pattern.t) (v:value)
@@ -696,23 +670,63 @@ let rec matches_pattern_and_extractions (p:Pattern.t) (v:value)
     | (Pattern.Wildcard,_) -> []
     | _ -> failwith ("bad typechecking: pattern: " ^ Pattern.show p ^ "value: " ^ show_value v)
   end
-	
-	
+
+type node = t * int list [@@deriving show](* (exprkind, children) *)
+type value_or_exn = Value of value | Exn of string 	[@@deriving show]
+
+let nid = ref 0;;
+let id2node = ref BatMap.empty (* (int, node) BatMap.t  *)
+let node2id = ref BatMap.empty (* (node, int) BatMap.t  *)
+let id2v = ref BatMap.empty;; (* (int, value_or_exn) BatMap.t *)
+
+let id_of_node node = 
+	if BatMap.mem node !node2id then 
+		BatMap.find node !node2id
+	else 
+		let _ = nid := !nid + 1 in 
+		let _ = id2node := BatMap.add !nid node !id2node in
+		let _ = node2id := BatMap.add node !nid !node2id in
+		!nid
+
+let rec node_of_expr (e : t) : (int * node) = 
+	let ekind = ekind_of_expr e in 
+	(* match e with 
+	| Var _  | Wildcard -> 
+		let node = (ekind, []) in 
+		let id = id_of_node node in 
+		(id, node)
+	| _ -> *)
+		let children_nodes = List.map (fun e' -> fst (node_of_expr e')) (children_of_expr e) in
+		let node = (ekind, children_nodes) in
+		let id = id_of_node node in
+		(id, node)
+
+let rec expr_of_node (ekind, ids) = 
+	match ekind with 
+	| Var _ | Wildcard -> ekind
+	| _ -> 
+		let children = List.map (fun id -> expr_of_node (BatMap.find id !id2node)) ids in
+		construct_from_ekind_and_argexprs ekind children
+
+(* let cache = Hashtbl.create ~random:false 100000 *)
+let eval_time = ref 0. 
 let rec evaluate (e : t) : value =
+	(* if (Hashtbl.mem cache e) then Hashtbl.find cache e
+	else *)
 	let result = 
     match e with
     | Wildcard -> WildcardV
     | Var i -> failwith ("unbound variable " ^ i)
   	| App (e1, e2) ->
       let v1 = evaluate e1 in
-      let e1 = exp_of_value v1 in
+      (* let e1 = exp_of_value v1 in *)
       begin 
-  			match e1 with
-        | Func ((i,_),e1) ->
+  			match v1 with
+        | FuncV ((i,_),e1) ->
           let v2 = evaluate e2 in
           let e2 = exp_of_value v2 in 
   				evaluate (replace i e2 e1) 
-        | Wildcard -> WildcardV
+        | WildcardV -> WildcardV
         | _ -> failwith "nonfunc applied"
       end
     | Eq (b,e1,e2) ->
@@ -765,14 +779,129 @@ let rec evaluate (e : t) : value =
   		begin 
   			match v with
   			| CtorV(i', v') ->
-  				let _ = assert (String.equal i  i') in 
-  				v' 
+  				if (String.equal i  i') then v' else failwith "bad unconstructor!"
   			| _ -> failwith "bad unconstructor!"
     	end
 	in
-	(* prerr_endline (Printf.sprintf "evaluate: %s -> %s" (show e) (show_value result)); *)
+	(* let _ = Hashtbl.add cache e result in *)
 	result
+
+let rec evaluate_node (((ekind, ids) as n) : node) : value =
+	(* let _ = print_endline ("evaluating node: " ^ (show_node n)) in  *)
+	let id = BatMap.find n !node2id in 
+	if (BatMap.mem id !id2v) then 
+		match BatMap.find id !id2v with 
+		| Value v -> v
+		| Exn s -> failwith s
+	else
+	try
+	let result = 
+		match ekind with
+		| Wildcard -> WildcardV
+		| Var i -> failwith ("unbound variable " ^ i)
+		| App _ ->
+			let _ = assert ((List.length ids) = 2) in
+			let v1 = BatMap.find (List.nth ids 0) !id2node |> evaluate_node in
+			begin 
+				match v1 with
+				| FuncV ((i,_),e1) ->
+					let v2 = BatMap.find (List.nth ids 1) !id2node |> evaluate_node in
+					let e2 = exp_of_value v2 in 
+					(* evaluate (replace i e2 e1) *)
+					evaluate_node (snd (node_of_expr (replace i e2 e1)))
+				| WildcardV -> WildcardV
+				| _ -> failwith "nonfunc applied"
+			end
+		| Eq _ ->
+			let _ = assert ((List.length ids) = 2) in
+			let v1 = BatMap.find (List.nth ids 0) !id2node |> evaluate_node in
+			let v2 = BatMap.find (List.nth ids 1) !id2node |> evaluate_node in
+			let eq = equal_value v1 v2 in
+			let res = if eq then eq else not eq in
+			value_of_bool res
+		| Func (a,_) -> 
+			let _ = assert ((List.length ids) = 1) in
+			FuncV(a, BatMap.find (List.nth ids 0) !id2node |> expr_of_node)
+		| Ctor (i,_) ->
+			let _ = assert ((List.length ids) = 1) in
+			let v = BatMap.find (List.nth ids 0) !id2node |> evaluate_node in
+			CtorV (i, v)
+		| Match (e,branches) as match_expr ->
+			let v = evaluate e in
+			let bindings_branchexp_opt : ((string * value) list * node) option list =
+				List.mapi (fun i (p,_) ->
+					try 
+						let n = BatMap.find (List.nth ids i) !id2node in 
+						Some ((matches_pattern_and_extractions p v), n)
+					with InvalidPatternMatch -> None  
+				) branches
+			in
+			let (bindings,branch_e) =
+				if List.for_all (BatOption.is_none) bindings_branchexp_opt then
+						failwith ((show_value v) ^ " not matched: \n " ^ (show match_expr))
+				else 
+					List.find BatOption.is_some bindings_branchexp_opt |> BatOption.get
+			in
+			let eval_context = 
+				List.fold_left (fun ec (i,v) ->
+					let _ = assert (v <> WildcardV) in  
+					BatMap.add i (exp_of_value v) ec
+				) BatMap.empty bindings 
+			in 
+			let branch_e = expr_of_node branch_e in 
+			(replace_holes eval_context branch_e) |> node_of_expr |> snd  |> evaluate_node 
+		| Fix (i,_,_) ->
+			let _ = assert ((List.length ids) = 1) in
+			let e = expr_of_node n in 
+			(* let _ = print_endline ("fix: " ^ (show e)) in *)
+			let n' = BatMap.find (List.nth ids 0) !id2node in 
+			let e' = expr_of_node n' in
+			(* let _ = print_endline ("body: " ^ (show e')) in *)
+			(* evaluate (replace i e e') *)
+			evaluate_node (snd (node_of_expr (replace i e e')))
+		| Tuple _ ->
+			let ns = List.map (fun id -> BatMap.find id !id2node) ids in
+			let vs = List.map evaluate_node ns in
+			TupleV vs
+		| Proj (i,_) ->
+			let _ = assert ((List.length ids) = 1) in
+			let v = BatMap.find (List.nth ids 0) !id2node |> evaluate_node in
+			begin 
+				match v with
+				| WildcardV -> WildcardV
+				| TupleV vs -> List.nth vs i
+				| _ -> failwith "bad projection!"
+			end
+		| Unctor (i,_) ->
+			let _ = assert ((List.length ids) = 1) in
+			let v = BatMap.find (List.nth ids 0) !id2node |> evaluate_node in
+			begin 
+				match v with
+				| CtorV(i', v') ->
+					if (String.equal i  i') then v' else failwith "bad unconstructor!"
+				| _ -> failwith "bad unconstructor!"
+			end
+	in
+	let _ = id2v := BatMap.add (BatMap.find n !node2id) (Value result) !id2v in
+	result
+	with Failure s -> 
+		let _ = id2v := BatMap.add (BatMap.find n !node2id) (Exn s) !id2v in
+		failwith s		
+
+(* let evaluate e = 
+	let n = snd (node_of_expr e) in
+	(* let _ = print_endline ("before evaluation of " ^ (show e)) in
+	let _ = print_endline ("id2node : " ^ (string_of_map string_of_int show_node !id2node)) in
+	let _ = print_endline ("id2v : " ^ (string_of_map string_of_int show_value_or_exn !id2v)) in
+	let _ = print_endline ("node : " ^ (show_node n)) in *)
+	let result = evaluate_node n in 
+	(* let _ = print_endline ("after evaluation of " ^ (show e)) in
+	let _ = print_endline ("id2node : " ^ (string_of_map string_of_int show_node !id2node)) in
+	let _ = print_endline ("id2v : " ^ (string_of_map string_of_int show_value_or_exn !id2v)) in
+	let _ = print_endline ("node : " ^ (show_node n)) in *)
+	result *)
 	
+		
 let evaluate_with_context eval_context (e : t) : value =
 	let e = replace_holes eval_context e in
   evaluate e
@@ -780,13 +909,12 @@ let evaluate_with_context eval_context (e : t) : value =
 let safe_evaluate (e : t) : value =
 	try
   	evaluate e 
-	with _ -> Bot
+	with Failure _ -> Bot
 
 let safe_evaluate_with_context eval_context (e : t) : value =
 	try
 		let e = replace_holes eval_context e in
   	evaluate e 
-	with exn -> 
-		(* my_prerr_endline ("exception in safe_evaluate_with_context: " ^ (Printexc.to_string exn)); *)
+	with Failure _ -> 
 		Bot
 	
