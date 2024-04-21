@@ -47,8 +47,7 @@ let add_expr ty expr ty_to_exprs =
 	BatMap.add ty (BatSet.add expr exprs) ty_to_exprs 
 
 
-let is_structurally_decreasing spec e =	 
-	let input_values = List.map fst spec.spec in
+let is_structurally_decreasing _ e =	 
 	let rec_calls = get_recursive_calls e in
 	BatSet.for_all (fun rec_call_exp ->
 		let arg_exp = 
@@ -60,12 +59,7 @@ let is_structurally_decreasing spec e =
 		if is_recursive arg_exp then 
 			false 
 		else 
-			let signature = compute_signature_simple spec arg_exp in
-			(* TODO : for_all2 -> exists2 to support tail recursion *)
-			let decreasing = List.for_all2 lt_value signature input_values in
-			(* argument is decreasing && including the parameter variable x 
-				 (otherwise, it is a function call with a constant, which is meaningless) *)
-			decreasing && (contains_id target_func_arg arg_exp)
+			is_decreasing_expr arg_exp
 	) rec_calls
 			
 (* check if a match expression has a base case (i.e., a branch with no recursive calls) *)
@@ -74,10 +68,7 @@ let is_match_with_basecase e =
 	| Match (_, patterns) ->
 		if (BatList.is_empty patterns) then true
 		else 
-			let rec_calls_in_branches = 
-				List.map (fun (_, e) -> get_recursive_calls e) patterns 
-			in
-			(List.exists BatSet.is_empty rec_calls_in_branches) 
+			(List.exists (fun (_, e) -> (count_recursions e) = 0) patterns)
 	| _ -> false 		 
 			 
 (* check if a recursive expression can evaluate without non-termination *)						

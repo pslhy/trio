@@ -119,8 +119,8 @@ let rec match_depth e =
 	| Ctor (_, e') -> (match_depth e')
 	| Unctor (_, e') -> (match_depth e')
 	| Eq (_, e1, e2) -> (max (match_depth e1) (match_depth e2))
-	| Match (e', patterns) -> 
-		(List.fold_left (fun acc (_, e') -> max acc (match_depth e')) (match_depth e') patterns) + 1
+	| Match (_, patterns) -> 
+		(List.fold_left (fun acc (_, e') -> max acc (match_depth e')) 0 patterns) + 1
 	| Fix (_, _, e') -> (match_depth e') + 1
 	| Tuple es -> if BatList.is_empty es then 0 else BatList.max (List.map match_depth es)
 	| Proj (_, e') -> (match_depth e')
@@ -559,7 +559,48 @@ let rec get_args e =
   | Proj (_, e) -> (get_args e)
 	| _ -> BatSet.singleton e
 		
-		
+
+(* true if e is an argument expression of the target function that should be decreased *)	
+let rec is_decreasing_expr ?(idx=None) e = 
+	match e with 
+	| Unctor(_, Var i) when BatString.equal i target_func_arg -> true
+	| Unctor(_, Proj(n, Var i)) when BatString.equal i target_func_arg -> 
+		BatOption.is_none idx || (BatOption.get idx) = n
+	| Proj(_, e') -> is_decreasing_expr ~idx:idx e'
+	| Unctor(_, e') -> is_decreasing_expr ~idx:idx e'
+	| Tuple es -> List.exists (is_decreasing_expr ~idx:idx) es
+	| _ -> false
+
+(* get indices of arguments that should be decreased to guarantee termination *)	
+let rec get_keyargs e = 
+	let rec get_idxs e = 
+		match e with 
+		| Proj(n, Var i) when BatString.equal i target_func_arg -> BatSet.singleton n
+		| Proj(_, e') -> get_idxs e'
+		| Unctor(_, e') -> get_idxs e'
+		| Tuple es -> List.fold_left (fun acc e -> BatSet.union acc (get_idxs e)) BatSet.empty es
+		| App (e1, e2) -> BatSet.union (get_idxs e1) (get_idxs e2)
+		| Func (_, e) -> get_idxs e
+		| Ctor (_, e) -> get_idxs e
+		| Eq (_, e1, e2) -> BatSet.union (get_idxs e1) (get_idxs e2)
+		| _ -> BatSet.empty
+	in 
+	match e with 
+	| Match(e, patterns) -> 
+		let idxs = get_idxs e in 
+		List.fold_left (fun acc (_, branch) -> 
+			match branch with 
+			| Match _ -> BatSet.union acc (get_keyargs branch) 
+			| _ -> 
+				let rec_exprs_in_branch = 
+					get_recursive_calls branch 
+				in 
+				if BatSet.is_empty rec_exprs_in_branch then 
+					BatSet.union idxs acc 
+				else acc 
+		) BatSet.empty patterns
+	| _ -> BatSet.empty	
+	
 let value_of_bool b = 
 	if b then truev_ else falsev_
 

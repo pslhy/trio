@@ -1,5 +1,6 @@
 let debug = ref false
 let max_size = ref 128
+let max_height_vsa = ref 6
 let max_height = ref 6
 let init_comp_size = ref 5
 let find_all = ref false 
@@ -20,5 +21,6 @@ let options =
 	 ("-debug", Arg.Set debug, "print info for debugging");
 	 ("-max_size", Arg.Int (fun x -> max_size := x), "set the maximum size of candidates");
 	 ("-max_height", Arg.Int (fun x -> max_height := x), "set the maximum height of candidates");
+	 ("-max_height_vsa", Arg.Int (fun x -> max_height_vsa := x), "set the maximum height of VSAs");
 	 ("-init_comp_size", Arg.Int (fun x -> init_comp_size := x), "set the initial size of components");
   ]
