@@ -720,10 +720,10 @@ let main_loop spec (desired_sig, desired_type) (ty_to_exprs, ty_to_sigs, sig_to_
 						let _ = my_prerr_endline (Printf.sprintf "decreasing? %s" (string_of_bool (is_decreasing_expr arg_exp))) in
 						is_decreasing_expr arg_exp 
 					else
-						BatSet.exists (fun i -> 
+						BatSet.for_all (fun i -> 
 							let e = List.nth es i in 
 							let _ = my_prerr_endline (Printf.sprintf "decreasing? %d %s" i (string_of_bool (is_decreasing_expr ~idx:(Some i) e))) in
-							is_decreasing_expr ~idx:(Some i) e 
+							(is_decreasing_expr ~idx:(Some i) e) || (e = Proj(i, Var target_func_arg))
 						) keyargs
 				| _ -> assert false
 				) call_exprs
