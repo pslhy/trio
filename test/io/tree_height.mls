@@ -45,4 +45,4 @@ synth tree -> nat satisfying
 [Node (0, Node (0, Leaf, Leaf), Node (0, Leaf, Leaf))] -> 2,
 [Node (0, Node (0, Node (0, Leaf, Leaf), Leaf), Leaf)] -> 3,
 [Node (0, Node (1, Leaf, Leaf), Node (0, Node(1, Leaf, Leaf), Node(1, Leaf, Leaf)))] -> 3,
-[Node (0, Node (1, Leaf, Node(1, Leaf, Leaf)), Node (0, Leaf, Node(1, Node(0, Leaf, Leaf), Leaf)))] -> 3,
+[Node (0, Node (1, Leaf, Node(1, Leaf, Leaf)), Node (0, Leaf, Node(1, Node(0, Leaf, Leaf), Leaf)))] -> 4,
