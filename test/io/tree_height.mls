@@ -29,9 +29,9 @@ let max =
     fun (x:nat) ->
      fun (y:nat) ->
       match (compare x y) with
-        | LT _ -> x
+        | LT _ -> y
         | EQ _ -> x
-        | GT _ -> y
+        | GT _ -> x
 ;;
 
 synth tree -> nat satisfying
